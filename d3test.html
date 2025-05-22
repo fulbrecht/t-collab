@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>D3.js - Draggable T Account Box</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+        .draggable-group {
+            cursor: grab;
+        }
+        .draggable-group.dragging {
+            cursor: grabbing;
+        }
+        .t-box {
+            fill: #A9CCE3; /* Light blue fill */
+            stroke: #2E86C1; /* Darker blue stroke */
+            stroke-width: 2px;
+        }
+        .t-text {
+            text-anchor: middle; /* Center the text horizontally */
+            dominant-baseline: middle; /* Center the text vertically */
+            fill: #1A5276; /* Dark blue text */
+            font-size: 16px;
+            pointer-events: none; /* Make text non-interactive for dragging */
+        }
+        svg {
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Add Socket.IO client library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // Define dimensions for SVG and the box
+        const svgWidth = 800;
+        const svgHeight = 600;
+        const boxWidth = 120;
+        const boxHeight = 70;
+        // Initial position will now be primarily set by the server.
+        // Client-side default if needed, but server 'initialBoxPosition' is preferred.
+        // const initialX = (svgWidth - boxWidth) / 2;
+        // const initialY = (svgHeight - boxHeight) / 2;
+
+        // Create SVG container
+        const svg = d3.select("body").append("svg")
+            .attr("width", svgWidth)
+            .attr("height", svgHeight);
+
+        // Data for our draggable box.
+        // Initialize with a default, but server will provide the authoritative position.
+        const boxData = [{ x: (svgWidth - boxWidth) / 2, y: (svgHeight - boxHeight) / 2 }];
+
+        // Create a group for the box and text (to drag them together)
+        const draggableGroup = svg.selectAll(".draggable-group")
+            .data(boxData)
+            .enter()
+            .append("g")
+            .attr("class", "draggable-group")
+            .attr("transform", d => `translate(${d.x}, ${d.y})`);
+
+        // Append the rectangle (the box) to the group
+        draggableGroup.append("rect")
+            .attr("class", "t-box")
+            .attr("width", boxWidth)
+            .attr("height", boxHeight);
+
+        // Append the text to the group
+        draggableGroup.append("text")
+            .attr("class", "t-text")
+            .attr("x", boxWidth / 2) // Center text horizontally within the box
+            .attr("y", boxHeight / 2) // Center text vertically within the box
+            .text("T account");
+
+        // --- 2. Socket.IO Client-Side Integration ---
+        const socket = io(); // Connects to the server that serves the page
+
+        // Function to update the box's visual position
+        function updateBoxVisualPosition(pos) {
+            boxData[0].x = pos.x;
+            boxData[0].y = pos.y;
+            draggableGroup.attr("transform", `translate(${pos.x}, ${pos.y})`);
+        }
+
+        // Listen for the initial position from the server
+        socket.on('initialBoxPosition', (serverPos) => {
+            console.log('Received initial box position:', serverPos);
+            updateBoxVisualPosition(serverPos);
+        });
+
+        // Listen for position updates from other clients (via server)
+        socket.on('boxPositionUpdate', (newPos) => {
+            console.log('Received box position update from another client:', newPos);
+            updateBoxVisualPosition(newPos);
+        });
+        // --- End Socket.IO Integration ---
+
+        // Define drag behavior
+        function dragstarted(event, d) {
+            d3.select(this).raise().classed("dragging", true);
+        }
+
+        function dragged(event, d) {
+            // Calculate the new potential x and y
+            let newX = event.x;
+            let newY = event.y;
+
+            // Constrain the new position within the SVG boundaries
+            // Math.max ensures the box doesn't go past the left/top edge
+            // Math.min ensures the box doesn't go past the right/bottom edge
+            d.x = Math.max(0, Math.min(newX, svgWidth - boxWidth));
+            d.y = Math.max(0, Math.min(newY, svgHeight - boxHeight));
+
+            d3.select(this).attr("transform", `translate(${d.x}, ${d.y})`);
+
+            // 3. Emit the new position to the server
+            socket.emit('boxMoved', { x: d.x, y: d.y });
+        }
+
+        function dragended(event, d) {
+            d3.select(this).classed("dragging", false);
+        }
+
+        // Apply the drag handler to the group
+        draggableGroup.call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+
+    </script>
+</body>
+</html>
