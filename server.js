@@ -82,6 +82,19 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Listen for a client renaming an account
+    socket.on('renameAccount', (data) => { // Expected data: { id: string, title: string }
+        console.log('Received renameAccount event:', data);
+        if (data && data.id && accountsData[data.id] && typeof data.title === 'string') {
+            accountsData[data.id].title = data.title;
+            // Broadcast the title change to all OTHER clients
+            socket.broadcast.emit('accountTitleUpdate', { id: data.id, title: data.title });
+            console.log(`Account ${data.id} renamed to "${data.title}". Notified other clients.`);
+        } else {
+            console.warn('Received invalid data for renameAccount event:', data);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         // Optional: Implement cleanup or notification if a user disconnects,

@@ -35,6 +35,7 @@
             dominant-baseline: middle; /* Center the text vertically */
             pointer-events: none; /* Make text non-interactive for dragging */
             font-family: sans-serif;
+            user-select: none; /* Prevent text selection during drag/click */
         }
         .t-account-title-text {
             font-size: 16px;
@@ -53,6 +54,17 @@
             border: 1px solid #ccc;
             display: block; /* Ensure it behaves as a block-level element */
             background-color: #fff; /* White background for the SVG area */
+        }
+        .rename-input {
+            position: absolute; /* Positioned relative to the page */
+            font-size: 16px;    /* Match title text style */
+            font-weight: bold;  /* Match title text style */
+            font-family: sans-serif; /* Match title text style */
+            text-align: center;
+            border: 1px solid #7F8C8D; /* A subtle border */
+            padding: 1px 3px;      /* Minimal padding */
+            box-sizing: border-box;/* Ensures padding/border are within width/height */
+            z-index: 1000;         /* Ensure it's on top of SVG elements */
         }
     </style>
 </head>
@@ -103,7 +115,13 @@
                 .attr("class", "t-account-title-text")
                 .attr("x", tAccountWidth / 2)
                 .attr("y", headerHeight / 2)
-                .text(d => d.title);
+                .text(d => d.title)
+                .style("pointer-events", "auto") // Make the title text itself clickable
+                .on("dblclick", function(event, d) {
+                    event.stopPropagation(); // Prevent drag from starting on double click
+                    const groupElement = d3.select(this.parentNode); // Get the <g> element
+                    showRenameInput(d, groupElement, this); // Pass data, group, and title text element
+                });
 
             // Horizontal line below the title (top of the T)
             selection.append("line")
@@ -241,6 +259,19 @@
                 console.error('Received invalid data for accountsArrangedUpdate:', arrangedData);
             }
         });
+
+        // Listen for title updates from other clients (via server)
+        socket.on('accountTitleUpdate', (data) => { // data = { id, title }
+            console.log('Received accountTitleUpdate from server:', data);
+            const accountToUpdate = boxData.find(acc => acc.id === data.id);
+            if (accountToUpdate) {
+                accountToUpdate.title = data.title;
+                // Update the text of the specific T-account's title in the SVG
+                svg.selectAll(".draggable-group")
+                    .filter(d_svg => d_svg.id === data.id) // d_svg to avoid conflict with outer d
+                    .select(".t-account-title-text").text(data.title);
+            }
+        });
         // --- End Socket.IO Integration ---
 
         // Define drag behavior
@@ -321,6 +352,67 @@
             renderTAccounts(); // Update SVG with new positions
             socket.emit('accountsArranged', boxData); // Send all updated account data to server
             console.log('T-accounts arranged locally and new layout sent to server.');
+        }
+
+        // --- Function to show input for renaming T-Account title ---
+        function showRenameInput(d, groupElement, titleTextElement) {
+            // Hide the SVG title text
+            d3.select(titleTextElement).style("visibility", "hidden");
+
+            // Get the bounding box of the SVG text element relative to the SVG viewport
+            const textScreenBBox = titleTextElement.getBoundingClientRect();
+
+            // Create and position the HTML input field
+            const input = d3.select("body").append("input")
+                .attr("type", "text")
+                .attr("class", "rename-input")
+                .style("left", textScreenBBox.left + "px")
+                .style("top", textScreenBBox.top + "px")
+                .style("width", textScreenBBox.width + "px") // Start with text width
+                .style("min-width", "100px") // Ensure a minimum usable width
+                .style("height", textScreenBBox.height + "px")
+                .property("value", d.title) // Set current title as value
+                .on("keypress", function(event) {
+                    if (event.key === "Enter") {
+                        event.preventDefault(); // Prevent any default form submission
+                        this.blur(); // Trigger blur to save and close
+                    }
+                })
+                .on("blur", function() {
+                    const newTitle = this.value.trim();
+                    d.title = newTitle || "Untitled"; // Use "Untitled" if input is empty
+
+                    // Update the SVG title text and make it visible again
+                    groupElement.select(".t-account-title-text")
+                        .text(d.title)
+                        .style("visibility", "visible");
+
+                    // Remove the HTML input field
+                    d3.select(this).remove();
+
+                    // Emit the change to the server
+                    socket.emit('renameAccount', { id: d.id, title: d.title });
+                });
+
+            // Automatically focus the input and select its text
+            input.node().focus();
+            input.node().select();
+
+            // Adjust input width dynamically if text is wider than initial estimate
+            // This is a bit of a refinement, might need more robust solution for long text
+            const tempSpan = d3.select("body").append("span")
+                .style("font-size", "16px")
+                .style("font-weight", "bold")
+                .style("font-family", "sans-serif")
+                .style("visibility", "hidden")
+                .style("position", "absolute")
+                .text(d.title);
+            const textWidth = tempSpan.node().getBoundingClientRect().width;
+            tempSpan.remove();
+            if (textWidth > textScreenBBox.width) {
+                input.style("width", (textWidth + 10) + "px"); // Add a little padding
+            }
+
         }
 
         document.getElementById('addAccountBtn').addEventListener('click', addNewTAccount);
