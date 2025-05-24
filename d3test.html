@@ -19,89 +19,226 @@
         .draggable-group.dragging {
             cursor: grabbing;
         }
-        .t-box {
-            fill: #A9CCE3; /* Light blue fill */
-            stroke: #2E86C1; /* Darker blue stroke */
-            stroke-width: 2px;
+        .t-account-box {
+            fill: #ECF0F1; /* Light grey background */
+            stroke: #95A5A6; /* Medium grey stroke */
+            stroke-width: 1.5px;
         }
-        .t-text {
+        .t-account-line {
+            stroke: #7F8C8D; /* Darker grey for lines */
+            stroke-width: 1px;
+        }
+        /* General text styling within a draggable T-account */
+        .draggable-group text {
             text-anchor: middle; /* Center the text horizontally */
             dominant-baseline: middle; /* Center the text vertically */
-            fill: #1A5276; /* Dark blue text */
-            font-size: 16px;
             pointer-events: none; /* Make text non-interactive for dragging */
+            font-family: sans-serif;
+        }
+        .t-account-title-text {
+            font-size: 16px;
+            font-weight: bold;
+            fill: #2C3E50; /* Dark blue-grey */
+        }
+        .t-account-column-label {
+            font-size: 12px;
+            fill: #34495E; /* Slightly lighter blue-grey */
+        }
+        .t-account-total-text {
+            font-size: 13px;
+            fill: #34495E;
         }
         svg {
             border: 1px solid #ccc;
+            display: block; /* Ensure it behaves as a block-level element */
+            background-color: #fff; /* White background for the SVG area */
         }
     </style>
 </head>
 <body>
 
+    <div style="margin-bottom: 10px; display: flex; justify-content: center; gap: 10px;">
+        <button id="addAccountBtn">Add New T-Account</button>
+        <button id="arrangeAccountsBtn">Arrange Accounts</button>
+        <button id="clearAccountsBtn">Clear All Accounts</button>
+    </div>
+
     <!-- 1. Add Socket.IO client library -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script>
+        // --- Global Variables & Constants ---
+        const socket = io(); // Connects to the server that serves the page
+
         // Define dimensions for SVG and the box
         const svgWidth = 800;
         const svgHeight = 600;
-        const boxWidth = 120;
-        const boxHeight = 70;
-        // Initial position will now be primarily set by the server.
-        // Client-side default if needed, but server 'initialBoxPosition' is preferred.
-        // const initialX = (svgWidth - boxWidth) / 2;
-        // const initialY = (svgHeight - boxHeight) / 2;
+
+        // T-Account dimensions
+        const tAccountWidth = 200;
+        const tAccountHeight = 250;
+        const headerHeight = 40; // Height for the title area
+        const totalsHeight = 30; // Height for the totals area at the bottom
+        const columnLabelYOffset = headerHeight + 20; // Y position for "Debits"/"Credits" labels
 
         // Create SVG container
         const svg = d3.select("body").append("svg")
             .attr("width", svgWidth)
             .attr("height", svgHeight);
 
-        // Data for our draggable box.
-        // Initialize with a default, but server will provide the authoritative position.
-        const boxData = [{ x: (svgWidth - boxWidth) / 2, y: (svgHeight - boxHeight) / 2 }];
+        // Data array for all T-Accounts
+        let boxData = [];
 
-        // Create a group for the box and text (to drag them together)
-        const draggableGroup = svg.selectAll(".draggable-group")
-            .data(boxData)
-            .enter()
-            .append("g")
-            .attr("class", "draggable-group")
-            .attr("transform", d => `translate(${d.x}, ${d.y})`);
+        // --- Helper function to build T-Account SVG elements ---
+        function buildTAccountStructure(selection) {
+            // Main bounding box for the T-Account
+            selection.append("rect")
+                .attr("class", "t-account-box")
+                .attr("width", tAccountWidth)
+                .attr("height", tAccountHeight);
 
-        // Append the rectangle (the box) to the group
-        draggableGroup.append("rect")
-            .attr("class", "t-box")
-            .attr("width", boxWidth)
-            .attr("height", boxHeight);
+            // Account Title
+            selection.append("text")
+                .attr("class", "t-account-title-text")
+                .attr("x", tAccountWidth / 2)
+                .attr("y", headerHeight / 2)
+                .text(d => d.title);
 
-        // Append the text to the group
-        draggableGroup.append("text")
-            .attr("class", "t-text")
-            .attr("x", boxWidth / 2) // Center text horizontally within the box
-            .attr("y", boxHeight / 2) // Center text vertically within the box
-            .text("T account");
+            // Horizontal line below the title (top of the T)
+            selection.append("line")
+                .attr("class", "t-account-line")
+                .attr("x1", 0).attr("y1", headerHeight)
+                .attr("x2", tAccountWidth).attr("y2", headerHeight);
 
-        // --- 2. Socket.IO Client-Side Integration ---
-        const socket = io(); // Connects to the server that serves the page
+            // Vertical line (stem of the T)
+            selection.append("line")
+                .attr("class", "t-account-line")
+                .attr("x1", tAccountWidth / 2).attr("y1", headerHeight)
+                .attr("x2", tAccountWidth / 2).attr("y2", tAccountHeight - totalsHeight);
 
-        // Function to update the box's visual position
-        function updateBoxVisualPosition(pos) {
-            boxData[0].x = pos.x;
-            boxData[0].y = pos.y;
-            draggableGroup.attr("transform", `translate(${pos.x}, ${pos.y})`);
+            // "Debits" label
+            selection.append("text")
+                .attr("class", "t-account-column-label")
+                .attr("x", tAccountWidth / 4) // Center in the left column
+                .attr("y", columnLabelYOffset)
+                .text("Debits");
+
+            // "Credits" label
+            selection.append("text")
+                .attr("class", "t-account-column-label")
+                .attr("x", (tAccountWidth / 4) * 3) // Center in the right column
+                .attr("y", columnLabelYOffset)
+                .text("Credits");
+
+            // Horizontal line above totals
+            selection.append("line")
+                .attr("class", "t-account-line")
+                .attr("x1", 0).attr("y1", tAccountHeight - totalsHeight)
+                .attr("x2", tAccountWidth).attr("y2", tAccountHeight - totalsHeight);
+
+            // "Total Debits" text (placeholder)
+            selection.append("text")
+                .attr("class", "t-account-total-text")
+                .attr("x", tAccountWidth / 4)
+                .attr("y", tAccountHeight - totalsHeight / 2)
+                .text("Total Dr: 0.00");
+
+            // "Total Credits" text (placeholder)
+            selection.append("text")
+                .attr("class", "t-account-total-text")
+                .attr("x", (tAccountWidth / 4) * 3)
+                .attr("y", tAccountHeight - totalsHeight / 2)
+                .text("Total Cr: 0.00");
         }
 
-        // Listen for the initial position from the server
-        socket.on('initialBoxPosition', (serverPos) => {
-            console.log('Received initial box position:', serverPos);
-            updateBoxVisualPosition(serverPos);
+        // --- Main rendering function for T-Accounts ---
+        function renderTAccounts() {
+            const groups = svg.selectAll(".draggable-group")
+                .data(boxData, d => d.id); // Use `d.id` as the key function
+
+            // Exit: Remove groups for accounts that no longer exist
+            groups.exit().remove();
+
+            // Enter: Create new groups for new accounts
+            const newGroups = groups.enter()
+                .append("g")
+                .attr("class", "draggable-group")
+                .attr("transform", d => `translate(${d.x}, ${d.y})`)
+                .call(d3.drag() // Apply drag behavior to new groups
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            buildTAccountStructure(newGroups); // Build the visual elements for new T-accounts
+
+            // Update: Update existing groups (e.g., if title or other properties change)
+            // For now, only transform is updated by drag or socket events directly.
+            // If other attributes (like title) were to be updated from data:
+            // groups.select(".t-account-title-text").text(d => d.title);
+            groups.attr("transform", d => `translate(${d.x}, ${d.y})`); // Ensure positions are correct
+        }
+
+
+        // --- Socket.IO Client-Side Integration ---
+
+        // Listen for the initial state (all accounts) from the server
+        socket.on('initialAccounts', (serverAccounts) => {
+            console.log('Received initial accounts:', serverAccounts);
+            boxData = serverAccounts; // Overwrite local data with server's authoritative list
+            renderTAccounts();
+        });
+
+        // Listen for a new account added by another client (or this client, echoed by server)
+        socket.on('newAccountAdded', (accountData) => {
+            console.log('Received new account from server:', accountData);
+            const exists = boxData.some(acc => acc.id === accountData.id);
+            if (!exists) {
+                boxData.push(accountData);
+                renderTAccounts();
+            } else {
+                console.log(`Account ${accountData.id} already exists locally.`);
+                // Optionally, update existing account data if necessary
+                const existingAccount = boxData.find(acc => acc.id === accountData.id);
+                Object.assign(existingAccount, accountData); // Merge properties
+                renderTAccounts(); // Re-render to reflect any changes
+            }
         });
 
         // Listen for position updates from other clients (via server)
-        socket.on('boxPositionUpdate', (newPos) => {
-            console.log('Received box position update from another client:', newPos);
-            updateBoxVisualPosition(newPos);
+        socket.on('boxPositionUpdate', (data) => { // data = { id, x, y }
+            console.log('Received box position update:', data);
+            const accountToUpdate = boxData.find(acc => acc.id === data.id);
+            if (accountToUpdate) {
+                accountToUpdate.x = data.x;
+                accountToUpdate.y = data.y;
+                // Find the specific group and update its transform directly
+                // This is more efficient than a full re-render for just position
+                svg.selectAll(".draggable-group")
+                    .filter(d => d.id === data.id)
+                    .attr("transform", `translate(${data.x}, ${data.y})`);
+            } else {
+                console.warn(`Account with id ${data.id} not found for position update.`);
+                // It's possible this account hasn't been added yet if messages are out of order
+                // A full renderTAccounts() might be a fallback, or wait for newAccountAdded
+            }
+        });
+
+        // Listen for server confirmation/broadcast that all accounts were cleared
+        socket.on('allAccountsCleared', () => {
+            console.log('Received allAccountsCleared from server.');
+            boxData = [];
+            renderTAccounts();
+        });
+
+        // Listen for server broadcast of an arranged layout
+        socket.on('accountsArrangedUpdate', (arrangedData) => {
+            console.log('Received accountsArrangedUpdate from server.');
+            if (Array.isArray(arrangedData)) {
+                boxData = arrangedData; // Replace local data with the new layout
+                renderTAccounts();
+            } else {
+                console.error('Received invalid data for accountsArrangedUpdate:', arrangedData);
+            }
         });
         // --- End Socket.IO Integration ---
 
@@ -111,6 +248,7 @@
         }
 
         function dragged(event, d) {
+            // d is the data object bound to the dragged element
             // Calculate the new potential x and y
             let newX = event.x;
             let newY = event.y;
@@ -118,24 +256,75 @@
             // Constrain the new position within the SVG boundaries
             // Math.max ensures the box doesn't go past the left/top edge
             // Math.min ensures the box doesn't go past the right/bottom edge
-            d.x = Math.max(0, Math.min(newX, svgWidth - boxWidth));
-            d.y = Math.max(0, Math.min(newY, svgHeight - boxHeight));
+            d.x = Math.max(0, Math.min(newX, svgWidth - tAccountWidth));
+            d.y = Math.max(0, Math.min(newY, svgHeight - tAccountHeight));
 
             d3.select(this).attr("transform", `translate(${d.x}, ${d.y})`);
 
             // 3. Emit the new position to the server
-            socket.emit('boxMoved', { x: d.x, y: d.y });
+            socket.emit('boxMoved', { id: d.id, x: d.x, y: d.y });
         }
 
         function dragended(event, d) {
             d3.select(this).classed("dragging", false);
         }
 
-        // Apply the drag handler to the group
-        draggableGroup.call(d3.drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended));
+        // --- Function to add a new T-Account ---
+        function addNewTAccount() {
+            const newId = `tAcc-${Date.now()}`; // Generate a unique ID
+
+            // Basic positioning for new accounts to avoid overlap
+            const accountsPerRow = Math.floor((svgWidth - 20) / (tAccountWidth + 10));
+            const newIndex = boxData.length;
+            const col = newIndex % accountsPerRow;
+            const row = Math.floor(newIndex / accountsPerRow);
+            const newX = 10 + col * (tAccountWidth + 10);
+            const newY = 10 + row * (tAccountHeight + 10);
+
+            const newAccountData = {
+                id: newId,
+                title: `Account ${boxData.length + 1}`, // Simple default title
+                x: newX,
+                y: newY
+            };
+            boxData.push(newAccountData);
+            renderTAccounts(); // Re-render all T-accounts
+            socket.emit('addAccount', newAccountData); // Notify server about the new account
+        }
+
+        // --- Function to clear all T-Accounts ---
+        function clearAllTAccounts() {
+            boxData = []; // Clear local data
+            renderTAccounts(); // Update the SVG to remove all accounts
+            socket.emit('clearAllAccounts'); // Notify server
+            console.log('All T-accounts cleared locally and request sent to server.');
+        }
+
+        // --- Function to arrange T-Accounts neatly ---
+        function arrangeTAccounts() {
+            if (boxData.length === 0) {
+                console.log('No T-accounts to arrange.');
+                return;
+            }
+
+            const padding = 10; // Padding around accounts and from SVG edges
+            const accountsPerRow = Math.max(1, Math.floor((svgWidth - padding) / (tAccountWidth + padding))); // Ensure at least 1 per row
+
+            boxData.forEach((account, index) => {
+                const col = index % accountsPerRow;
+                const row = Math.floor(index / accountsPerRow);
+                account.x = padding + col * (tAccountWidth + padding);
+                account.y = padding + row * (tAccountHeight + padding);
+            });
+
+            renderTAccounts(); // Update SVG with new positions
+            socket.emit('accountsArranged', boxData); // Send all updated account data to server
+            console.log('T-accounts arranged locally and new layout sent to server.');
+        }
+
+        document.getElementById('addAccountBtn').addEventListener('click', addNewTAccount);
+        document.getElementById('clearAccountsBtn').addEventListener('click', clearAllTAccounts);
+        document.getElementById('arrangeAccountsBtn').addEventListener('click', arrangeTAccounts);
 
     </script>
 </body>

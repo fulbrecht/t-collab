@@ -14,29 +14,78 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'd3test.html'));
 });
 
-// Store the current state of the box
-// Initial values match the client's calculation:
-// svgWidth = 800, boxWidth = 120 => initialX = (800 - 120) / 2 = 340
-// svgHeight = 600, boxHeight = 70 => initialY = (600 - 70) / 2 = 265
-let currentBoxPosition = { x: 340, y: 265 };
+// In-memory store for T-account data
+// We'll use an object where keys are account IDs, and values are the account objects.
+let accountsData = {};
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    // Send the current box position to the newly connected client
-    socket.emit('initialBoxPosition', currentBoxPosition);
+    // Send the current state of all accounts to the newly connected client
+    // Object.values() converts the accountsData object into an array of its values (the account objects)
+    socket.emit('initialAccounts', Object.values(accountsData));
 
-    // Listen for box move events from clients
-    socket.on('boxMoved', (newPosition) => {
-        // Update the server's record of the box position
-        currentBoxPosition = newPosition;
-        // Broadcast the new position to all other clients
-        socket.broadcast.emit('boxPositionUpdate', newPosition);
-        // console.log(`Box moved to: ${JSON.stringify(newPosition)} by ${socket.id}`);
+    // Listen for a new account being added by a client
+    socket.on('addAccount', (newAccountData) => {
+        console.log('Received addAccount event with data:', newAccountData);
+        if (newAccountData && newAccountData.id) {
+            accountsData[newAccountData.id] = newAccountData;
+            // Broadcast the new account to ALL clients (including the sender).
+            // The client-side logic should handle this gracefully (e.g., not re-adding if already present).
+            io.emit('newAccountAdded', newAccountData);
+            console.log(`Account ${newAccountData.id} titled "${newAccountData.title}" added. Total accounts: ${Object.keys(accountsData).length}`);
+        } else {
+            console.warn('Received invalid new account data:', newAccountData);
+        }
+    });
+
+    // Listen for T-account movement events from clients
+    socket.on('boxMoved', (data) => { // Expected data: { id: string, x: number, y: number }
+        // This can be very verbose if logged for every small movement.
+        // console.log('Received boxMoved event with data:', data);
+        if (data && data.id && accountsData[data.id]) {
+            // Update the server's record of the specific account's position
+            accountsData[data.id].x = data.x;
+            accountsData[data.id].y = data.y;
+            // Broadcast the updated position to all OTHER clients
+            socket.broadcast.emit('boxPositionUpdate', data);
+        } else {
+            console.warn('Received boxMoved event for an unknown or invalid account ID:', data ? data.id : 'undefined data');
+        }
+    });
+
+    // Listen for a client requesting to clear all accounts
+    socket.on('clearAllAccounts', () => {
+        console.log('Received clearAllAccounts event from client:', socket.id);
+        accountsData = {}; // Clear the server's account data
+        io.emit('allAccountsCleared'); // Broadcast to all clients that accounts are cleared
+        console.log('All accounts cleared on server. Notified all clients.');
+    });
+
+    // Listen for a client sending an arranged layout of accounts
+    socket.on('accountsArranged', (arrangedLayoutData) => {
+        console.log('Received accountsArranged event from client:', socket.id);
+        if (Array.isArray(arrangedLayoutData)) {
+            // Rebuild accountsData from the received layout
+            const newAccountsData = {};
+            arrangedLayoutData.forEach(account => {
+                if (account && account.id) {
+                    newAccountsData[account.id] = account;
+                }
+            });
+            accountsData = newAccountsData;
+            // Broadcast the new layout to all clients (including the sender for consistency, or use socket.broadcast if preferred)
+            io.emit('accountsArrangedUpdate', Object.values(accountsData));
+            console.log('Accounts layout updated on server. Notified all clients.');
+        } else {
+            console.warn('Received invalid data for accountsArranged event:', arrangedLayoutData);
+        }
     });
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+        // Optional: Implement cleanup or notification if a user disconnects,
+        // e.g., if accounts were tied to users, but for this scenario, it's likely not needed.
     });
 });
 
