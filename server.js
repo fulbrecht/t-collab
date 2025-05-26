@@ -2,12 +2,17 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const { Socket } = require('dgram');
+
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
 const PORT = process.env.PORT || 3000;
+
+// Serve static files (HTML, CSS, client-side JS) from the current directory
+app.use(express.static(__dirname));
 
 // Serve the HTML file from the root directory
 app.get('/', (req, res) => {
@@ -94,7 +99,7 @@ io.on('connection', (socket) => {
             console.warn('Received invalid data for renameAccount event:', data);
         }
     });
-    
+
     socket.on('addTransaction', (transaction) => {
         console.log('Received addTransaction:', transaction);
         // 1. Validate the transaction (e.g., ensure accounts exist, debits === credits)
