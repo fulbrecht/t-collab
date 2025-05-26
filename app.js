@@ -54,6 +54,23 @@ function buildTAccountStructure(selection) {
         .attr("x2", tAccountWidth / 2).attr("y2", tAccountHeight - totalsHeight);
 
     // "Debits" label
+    // Delete button (e.g., an "X" in the top-right corner)
+    selection.append("text")
+        .attr("class", "delete-account-btn")
+        .attr("x", tAccountWidth - 10) // Position X (10px from the right edge)
+        .attr("y", 15)                 // Position Y (15px from the top edge)
+        .style("cursor", "pointer")
+        .style("font-size", "18px")
+        .style("fill", "#E74C3C") // A reddish color for delete
+        .style("pointer-events", "auto") // Ensure it's clickable
+        .text("X")
+        .on("click", function(event, d) {
+            event.stopPropagation(); // Prevent drag or other parent events
+            if (confirm(`Are you sure you want to delete account "${d.title}"?`)) {
+                deleteAccount(d.id);
+            }
+        });
+
     selection.append("text")
         .attr("class", "t-account-column-label")
         .attr("x", tAccountWidth / 4) // Center in the left column
@@ -221,6 +238,17 @@ socket.on('accountTitleUpdate', (data) => { // data = { id, title }
     }
 });
 
+// Listen for an account being deleted by another client (via server)
+socket.on('accountDeleted', (accountId) => {
+    console.log('Received accountDeleted from server for ID:', accountId);
+    const index = boxData.findIndex(acc => acc.id === accountId);
+    if (index > -1) {
+        boxData.splice(index, 1);
+        renderTAccounts();
+        console.log(`Account ${accountId} removed locally.`);
+    }
+});
+
 // Listen for new transaction added by server (or other client)
 socket.on('transactionAdded', (transaction) => {
     console.log('Received transactionAdded from server:', transaction);
@@ -292,6 +320,18 @@ function addNewTAccount() {
     boxData.push(newAccountData);
     renderTAccounts(); // Re-render all T-accounts
     socket.emit('addAccount', newAccountData); // Notify server about the new account
+}
+
+// --- Function to delete a T-Account ---
+function deleteAccount(accountId) {
+    const index = boxData.findIndex(acc => acc.id === accountId);
+    if (index > -1) {
+        const deletedAccountTitle = boxData[index].title;
+        boxData.splice(index, 1); // Remove from local data
+        renderTAccounts(); // Update the SVG
+        socket.emit('deleteAccount', accountId); // Notify server
+        console.log(`Account "${deletedAccountTitle}" (ID: ${accountId}) deleted locally and request sent to server.`);
+    }
 }
 
 // --- Function to clear all T-Accounts ---

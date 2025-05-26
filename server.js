@@ -100,6 +100,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Listen for a client deleting an account
+    socket.on('deleteAccount', (accountId) => {
+        console.log('Received deleteAccount event for ID:', accountId);
+        if (accountId && accountsData[accountId]) {
+            const deletedAccountTitle = accountsData[accountId].title;
+            delete accountsData[accountId]; // Remove from server's data store
+            // Broadcast the ID of the deleted account to ALL clients (including the sender for consistency, or use socket.broadcast)
+            io.emit('accountDeleted', accountId);
+            console.log(`Account "${deletedAccountTitle}" (ID: ${accountId}) deleted from server. Notified all clients. Total accounts: ${Object.keys(accountsData).length}`);
+        } else {
+            console.warn('Received deleteAccount event for an unknown or invalid account ID:', accountId);
+        }
+    });
+
     socket.on('addTransaction', (transaction) => {
         console.log('Received addTransaction:', transaction);
         // 1. Validate the transaction (e.g., ensure accounts exist, debits === credits)
