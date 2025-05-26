@@ -22,6 +22,9 @@ app.get('/', (req, res) => {
 // In-memory store for T-account data
 // We'll use an object where keys are account IDs, and values are the account objects.
 let accountsData = {};
+// In-memory store for transactions
+let transactions = [];
+
 
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
@@ -29,6 +32,8 @@ io.on('connection', (socket) => {
     // Send the current state of all accounts to the newly connected client
     // Object.values() converts the accountsData object into an array of its values (the account objects)
     socket.emit('initialAccounts', Object.values(accountsData));
+    // Send existing transactions to the newly connected client
+    socket.emit('initialTransactions', transactions);
 
     // Listen for a new account being added by a client
     socket.on('addAccount', (newAccountData) => {
@@ -62,9 +67,10 @@ io.on('connection', (socket) => {
     // Listen for a client requesting to clear all accounts
     socket.on('clearAllAccounts', () => {
         console.log('Received clearAllAccounts event from client:', socket.id);
-        accountsData = {}; // Clear the server's account data
+        accountsData = {}; // Clear the server's T-account data
+        transactions = []; // Clear the server's transaction data
         io.emit('allAccountsCleared'); // Broadcast to all clients that accounts are cleared
-        console.log('All accounts cleared on server. Notified all clients.');
+        console.log('All T-accounts and transactions cleared on server. Notified all clients.');
     });
 
     // Listen for a client sending an arranged layout of accounts
@@ -116,23 +122,62 @@ io.on('connection', (socket) => {
 
     socket.on('addTransaction', (transaction) => {
         console.log('Received addTransaction:', transaction);
-        // 1. Validate the transaction (e.g., ensure accounts exist, debits === credits)
-        // 2. Update server-side accountsData:
-        //    Iterate transaction.entries
-        //    Find account in accountsData by entry.accountId
-        //    Add to account.debits/credits and update account.totalDebits/totalCredits
-        // 3. Store the transaction itself if needed (e.g., in the `transactions` array)
-        // 4. Broadcast the processed transaction or the updated accounts to all clients
-        //    Option A: Broadcast the transaction, clients apply it
-        //    io.emit('transactionAdded', transaction); 
-        //    Option B: Broadcast all updated accounts (simpler for client, more data)
-        //    io.emit('accountsUpdated', Object.values(accountsData)); 
-        //    For Option B, client would listen to 'accountsUpdated' and replace boxData.
+        if (!transaction || !transaction.id || !Array.isArray(transaction.entries) || transaction.entries.length < 2) {
+            console.warn('Invalid transaction data received:', transaction);
+            // Optionally, send an error back to the client
+            // socket.emit('transactionError', { message: 'Invalid transaction data.' });
+            return;
+        }
 
-        // For now, let's assume Option A for client-side 'transactionAdded' listener
-        // The client-side processTransaction already updates the initiator.
-        // So, broadcast to others.
-        socket.broadcast.emit('transactionAdded', transaction); // Client needs to implement full processing for this
+        let totalDebits = 0;
+        let totalCredits = 0;
+        let accountsToUpdate = new Set(); // To track which accounts are affected
+
+        // 1. Validate transaction entries and calculate totals
+        for (const entry of transaction.entries) {
+            if (!entry.accountId || !accountsData[entry.accountId] || !entry.type || typeof entry.amount !== 'number' || entry.amount <= 0) {
+                console.warn('Invalid transaction entry:', entry);
+                // socket.emit('transactionError', { message: `Invalid entry for account ${entry.accountId || 'unknown'}.` });
+                return;
+            }
+            if (entry.type === 'debit') {
+                totalDebits += entry.amount;
+            } else if (entry.type === 'credit') {
+                totalCredits += entry.amount;
+            } else {
+                console.warn('Invalid entry type:', entry.type);
+                // socket.emit('transactionError', { message: `Invalid entry type ${entry.type}.` });
+                return;
+            }
+            accountsToUpdate.add(entry.accountId);
+        }
+
+        if (totalDebits !== totalCredits || totalDebits === 0) {
+            console.warn(`Transaction imbalance or zero total: Debits ${totalDebits}, Credits ${totalCredits}`);
+            // socket.emit('transactionError', { message: 'Transaction debits must equal credits and not be zero.' });
+            return;
+        }
+
+        // 2. Update server-side accountsData
+        transaction.entries.forEach(entry => {
+            const account = accountsData[entry.accountId];
+            const newServerEntry = { id: `s_entry-${Date.now()}-${Math.random()}`, transactionId: transaction.id, amount: entry.amount, description: transaction.description };
+            if (entry.type === 'debit') {
+                account.debits.push(newServerEntry);
+                account.totalDebits += entry.amount;
+            } else { // credit
+                account.credits.push(newServerEntry);
+                account.totalCredits += entry.amount;
+            }
+        });
+
+        // 3. Store the transaction itself
+        transactions.push(transaction);
+
+        // 4. Broadcast the processed transaction to all OTHER clients
+        // The client that initiated the transaction already processed it locally.
+        socket.broadcast.emit('transactionAdded', transaction);
+        console.log(`Transaction ${transaction.id} processed and broadcasted. Affected accounts: ${Array.from(accountsToUpdate).join(', ')}`);
     });
 
 

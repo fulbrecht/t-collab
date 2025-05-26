@@ -176,6 +176,12 @@ socket.on('initialAccounts', (serverAccounts) => {
     renderTAccounts();
 });
 
+socket.on('initialTransactions', (serverTransactions) => {
+    console.log('Received initial transactions:', serverTransactions);
+    transactions = serverTransactions; // Overwrite local transactions with server's list
+    renderTransactionList(); // Render the list based on this initial data
+});
+
 // Listen for a new account added by another client (or this client, echoed by server)
 socket.on('newAccountAdded', (accountData) => {
     console.log('Received new account from server:', accountData);
@@ -215,7 +221,9 @@ socket.on('boxPositionUpdate', (data) => { // data = { id, x, y }
 socket.on('allAccountsCleared', () => {
     console.log('Received allAccountsCleared from server.');
     boxData = [];
+    transactions = []; // Also clear transactions
     renderTAccounts();
+    renderTransactionList(); // And re-render the transaction list
 });
 
 // Listen for server broadcast of an arranged layout
@@ -261,8 +269,12 @@ socket.on('transactionAdded', (transaction) => {
     // might send updated account data or we might need to re-fetch.
     // For a quick test, if the server sends all accounts, we can just update:
     // if (transaction.updatedAccounts) {
-    // A more robust client-side processing of the transaction:    
+    // A more robust client-side processing of the transaction:
     if (transaction && transaction.entries) {
+        // Ensure the transaction is added to the local list if it's not already there
+        if (!transactions.find(t => t.id === transaction.id)) {
+            transactions.push(transaction);
+        }
         processTransaction(transaction, false); // Process without re-emitting to server
     }
 });
@@ -335,12 +347,14 @@ function deleteAccount(accountId) {
     }
 }
 
-// --- Function to clear all T-Accounts ---
-function clearAllTAccounts() {
+// --- Function to clear all T-Accounts and Transactions ---
+function clearAllData() {
     boxData = []; // Clear local data
+    transactions = []; // Clear local transactions
     renderTAccounts(); // Update the SVG to remove all accounts
+    renderTransactionList(); // Update the transaction list
     socket.emit('clearAllAccounts'); // Notify server
-    console.log('All T-accounts cleared locally and request sent to server.');
+    console.log('All T-accounts and transactions cleared locally and request sent to server.');
 }
 
 // --- Function to arrange T-Accounts neatly ---
@@ -538,7 +552,6 @@ saveTransactionBtn.onclick = function() {
 
     const transaction = { id: `txn-${Date.now()}`, description, entries };
     processTransaction(transaction); // Process locally first
-    transactions.push(transaction); // Store transaction locally
     socket.emit('addTransaction', transaction); // Notify server
     transactionModal.style.display = "none";
 }
@@ -546,6 +559,11 @@ saveTransactionBtn.onclick = function() {
 function processTransaction(transaction, emitToServer = true) { // Added emitToServer flag
     transaction.entries.forEach(entry => {
         const account = boxData.find(acc => acc.id === entry.accountId);
+        // Ensure the transaction is added to the local list if it's not already there
+        // This is important for transactions coming from the server or being processed locally.
+        if (!transactions.find(t => t.id === transaction.id)) {
+            transactions.push(transaction);
+        }
         if (account) {
             const newEntry = { 
                 id: `entry-${Date.now()}-${Math.random()}`, // Unique entry ID
@@ -570,7 +588,7 @@ function processTransaction(transaction, emitToServer = true) { // Added emitToS
 }
 
 document.getElementById('addAccountBtn').addEventListener('click', addNewTAccount);
-document.getElementById('clearAccountsBtn').addEventListener('click', clearAllTAccounts);
+document.getElementById('clearAllBtn').addEventListener('click', clearAllData);
 document.getElementById('arrangeAccountsBtn').addEventListener('click', arrangeTAccounts);
 
 // --- Transaction List Logic ---
