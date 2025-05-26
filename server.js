@@ -94,6 +94,28 @@ io.on('connection', (socket) => {
             console.warn('Received invalid data for renameAccount event:', data);
         }
     });
+    
+    socket.on('addTransaction', (transaction) => {
+        console.log('Received addTransaction:', transaction);
+        // 1. Validate the transaction (e.g., ensure accounts exist, debits === credits)
+        // 2. Update server-side accountsData:
+        //    Iterate transaction.entries
+        //    Find account in accountsData by entry.accountId
+        //    Add to account.debits/credits and update account.totalDebits/totalCredits
+        // 3. Store the transaction itself if needed (e.g., in the `transactions` array)
+        // 4. Broadcast the processed transaction or the updated accounts to all clients
+        //    Option A: Broadcast the transaction, clients apply it
+        //    io.emit('transactionAdded', transaction); 
+        //    Option B: Broadcast all updated accounts (simpler for client, more data)
+        //    io.emit('accountsUpdated', Object.values(accountsData)); 
+        //    For Option B, client would listen to 'accountsUpdated' and replace boxData.
+
+        // For now, let's assume Option A for client-side 'transactionAdded' listener
+        // The client-side processTransaction already updates the initiator.
+        // So, broadcast to others.
+        socket.broadcast.emit('transactionAdded', transaction); // Client needs to implement full processing for this
+    });
+
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);

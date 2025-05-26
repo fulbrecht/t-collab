@@ -66,6 +66,52 @@
             box-sizing: border-box;/* Ensures padding/border are within width/height */
             z-index: 1000;         /* Ensure it's on top of SVG elements */
         }
+        /* Transaction Modal Styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 2000; /* Above rename input */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 5px;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+        }
+        .modal-content label {
+            display: block;
+            margin-top: 10px;
+        }
+        .modal-content input[type="text"],
+        .modal-content input[type="number"],
+        .modal-content select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .transaction-entry {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .transaction-entry select, .transaction-entry input { flex-grow: 1; }
+        .close-button { float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -75,6 +121,30 @@
         <button id="arrangeAccountsBtn">Arrange Accounts</button>
         <button id="clearAccountsBtn">Clear All Accounts</button>
     </div>
+    
+    <!-- Transaction Modal -->
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeTransactionModal">&times;</span>
+            <h2>New Transaction</h2>
+            <label for="transactionDescription">Description:</label>
+            <input type="text" id="transactionDescription" name="transactionDescription">
+
+            <div id="transactionEntriesContainer">
+                <!-- Transaction entry rows will be added here -->
+            </div>
+
+            <button id="addTransactionEntryRow" style="margin-top:15px; margin-bottom:15px;">Add Entry</button>
+            
+            <div>
+                <strong>Total Debits: <span id="modalTotalDebits">0.00</span></strong><br>
+                <strong>Total Credits: <span id="modalTotalCredits">0.00</span></strong>
+            </div>
+
+            <button id="saveTransactionBtn" style="margin-top:20px;">Save Transaction</button>
+        </div>
+    </div>
+    <!-- End Transaction Modal -->
 
     <!-- 1. Add Socket.IO client library -->
     <script src="/socket.io/socket.io.js"></script>
@@ -158,16 +228,16 @@
             // "Total Debits" text (placeholder)
             selection.append("text")
                 .attr("class", "t-account-total-text")
-                .attr("x", tAccountWidth / 4)
+                .attr("x", tAccountWidth / 4) // Keep x for general centering
                 .attr("y", tAccountHeight - totalsHeight / 2)
-                .text("Total Dr: 0.00");
+                .text(d => `Total Dr: ${d.totalDebits.toFixed(2)}`);
 
             // "Total Credits" text (placeholder)
             selection.append("text")
                 .attr("class", "t-account-total-text")
-                .attr("x", (tAccountWidth / 4) * 3)
+                .attr("x", (tAccountWidth / 4) * 3) // Keep x for general centering
                 .attr("y", tAccountHeight - totalsHeight / 2)
-                .text("Total Cr: 0.00");
+                .text(d => `Total Cr: ${d.totalCredits.toFixed(2)}`);
         }
 
         // --- Main rendering function for T-Accounts ---
@@ -190,10 +260,40 @@
 
             buildTAccountStructure(newGroups); // Build the visual elements for new T-accounts
 
-            // Update: Update existing groups (e.g., if title or other properties change)
-            // For now, only transform is updated by drag or socket events directly.
-            // If other attributes (like title) were to be updated from data:
-            // groups.select(".t-account-title-text").text(d => d.title);
+            // Update: Update existing groups
+            const allGroups = groups.merge(newGroups); // Combine enter and update selections
+
+            allGroups.each(function(d) { // d is the T-account data
+                const group = d3.select(this);
+
+                // Update totals
+                group.select(".debit-total").text(`Total Dr: ${d.totalDebits.toFixed(2)}`);
+                group.select(".credit-total").text(`Total Cr: ${d.totalCredits.toFixed(2)}`);
+
+                // --- Render Debit Entries ---
+                const debitEntries = group.selectAll(".debit-entry-text")
+                    .data(d.debits, entry => entry.id); // Assuming entries will have unique IDs
+                
+                debitEntries.enter().append("text")
+                    .attr("class", "debit-entry-text")
+                    .attr("x", tAccountWidth / 4)
+                    .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15)) // Position below "Debits" label
+                    .merge(debitEntries) // Combine enter and update
+                    .text(entry => entry.amount.toFixed(2)); // Or entry.description
+                debitEntries.exit().remove();
+
+                // --- Render Credit Entries ---
+                const creditEntries = group.selectAll(".credit-entry-text")
+                    .data(d.credits, entry => entry.id);
+                creditEntries.enter().append("text")
+                    .attr("class", "credit-entry-text")
+                    .attr("x", (tAccountWidth / 4) * 3)
+                    .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15)) // Position below "Credits" label
+                    .merge(creditEntries)
+                    .text(entry => entry.amount.toFixed(2));
+                creditEntries.exit().remove();
+            });
+
             groups.attr("transform", d => `translate(${d.x}, ${d.y})`); // Ensure positions are correct
         }
 
@@ -272,6 +372,20 @@
                     .select(".t-account-title-text").text(data.title);
             }
         });
+
+        // Listen for new transaction added by server (or other client)
+        socket.on('transactionAdded', (transaction) => {
+            console.log('Received transactionAdded from server:', transaction);
+            // This is a simplified update. A more robust system would apply
+            // the transaction to the local data. For now, we assume the server
+            // might send updated account data or we might need to re-fetch.
+            // For a quick test, if the server sends all accounts, we can just update:
+            // if (transaction.updatedAccounts) {
+            //     boxData = transaction.updatedAccounts;
+            //     renderTAccounts();
+            // }
+        });
+
         // --- End Socket.IO Integration ---
 
         // Define drag behavior
@@ -316,8 +430,12 @@
             const newAccountData = {
                 id: newId,
                 title: `Account ${boxData.length + 1}`, // Simple default title
+                debits: [], // Initialize debit entries array
+                credits: [], // Initialize credit entries array
+                totalDebits: 0,
+                totalCredits: 0,
                 x: newX,
-                y: newY
+                y: newY,
             };
             boxData.push(newAccountData);
             renderTAccounts(); // Re-render all T-accounts
@@ -413,6 +531,145 @@
                 input.style("width", (textWidth + 10) + "px"); // Add a little padding
             }
 
+        }
+        
+        // --- Transaction Modal Logic ---
+        const transactionModal = document.getElementById('transactionModal');
+        const closeTransactionModalBtn = document.getElementById('closeTransactionModal');
+        const addTransactionEntryRowBtn = document.getElementById('addTransactionEntryRow');
+        const transactionEntriesContainer = document.getElementById('transactionEntriesContainer');
+        const saveTransactionBtn = document.getElementById('saveTransactionBtn');
+        const transactionDescriptionInput = document.getElementById('transactionDescription');
+        
+        // Button to open the modal (you'll need to add this button to your HTML)
+        const openTransactionModalBtn = document.createElement('button');
+        openTransactionModalBtn.id = 'openTransactionModalBtn';
+        openTransactionModalBtn.textContent = 'New Transaction';
+        document.querySelector('div[style*="margin-bottom: 10px"]').appendChild(openTransactionModalBtn);
+
+        openTransactionModalBtn.onclick = function() {
+            transactionModal.style.display = "block";
+            transactionDescriptionInput.value = "";
+            transactionEntriesContainer.innerHTML = ''; // Clear previous entries
+            addEntryRowToModal(); // Add one initial entry row
+            addEntryRowToModal(); // Add second initial entry row
+            updateModalTotals();
+        }
+        closeTransactionModalBtn.onclick = function() {
+            transactionModal.style.display = "none";
+        }
+        window.onclick = function(event) {
+            if (event.target == transactionModal) {
+                transactionModal.style.display = "none";
+            }
+        }
+        addTransactionEntryRowBtn.onclick = addEntryRowToModal;
+
+        function addEntryRowToModal() {
+            const entryDiv = document.createElement('div');
+            entryDiv.className = 'transaction-entry';
+
+            const accountSelect = document.createElement('select');
+            accountSelect.className = 'transaction-account';
+            boxData.forEach(acc => {
+                const option = document.createElement('option');
+                option.value = acc.id;
+                option.textContent = acc.title;
+                accountSelect.appendChild(option);
+            });
+
+            const typeSelect = document.createElement('select');
+            typeSelect.className = 'transaction-type';
+            ['Debit', 'Credit'].forEach(type => {
+                const option = document.createElement('option');
+                option.value = type.toLowerCase();
+                option.textContent = type;
+                typeSelect.appendChild(option);
+            });
+
+            const amountInput = document.createElement('input');
+            amountInput.type = 'number';
+            amountInput.className = 'transaction-amount';
+            amountInput.placeholder = 'Amount';
+            amountInput.min = '0.01';
+            amountInput.step = '0.01';
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = 'Remove';
+            removeBtn.onclick = function() { entryDiv.remove(); updateModalTotals(); };
+
+            entryDiv.appendChild(accountSelect);
+            entryDiv.appendChild(typeSelect);
+            entryDiv.appendChild(amountInput);
+            entryDiv.appendChild(removeBtn);
+            transactionEntriesContainer.appendChild(entryDiv);
+
+            amountInput.oninput = updateModalTotals;
+            typeSelect.onchange = updateModalTotals;
+        }
+
+        function updateModalTotals() {
+            let totalDebits = 0;
+            let totalCredits = 0;
+            document.querySelectorAll('.transaction-entry').forEach(row => {
+                const type = row.querySelector('.transaction-type').value;
+                const amount = parseFloat(row.querySelector('.transaction-amount').value) || 0;
+                if (type === 'debit') totalDebits += amount;
+                else if (type === 'credit') totalCredits += amount;
+            });
+            document.getElementById('modalTotalDebits').textContent = totalDebits.toFixed(2);
+            document.getElementById('modalTotalCredits').textContent = totalCredits.toFixed(2);
+        }
+
+        saveTransactionBtn.onclick = function() {
+            const description = transactionDescriptionInput.value.trim();
+            const entries = [];
+            let totalDebits = 0;
+            let totalCredits = 0;
+
+            document.querySelectorAll('.transaction-entry').forEach(row => {
+                const accountId = row.querySelector('.transaction-account').value;
+                const type = row.querySelector('.transaction-type').value;
+                const amount = parseFloat(row.querySelector('.transaction-amount').value);
+
+                if (!accountId || !type || isNaN(amount) || amount <= 0) {
+                    // Basic validation for each row
+                    return; // Skip invalid rows for now
+                }
+                entries.push({ accountId, type, amount });
+                if (type === 'debit') totalDebits += amount;
+                else totalCredits += amount;
+            });
+
+            if (entries.length < 2) { alert("Please add at least two entries."); return; }
+            if (totalDebits !== totalCredits) { alert("Total debits must equal total credits."); return; }
+            if (totalDebits === 0) { alert("Transaction amount cannot be zero."); return; }
+
+            const transaction = { id: `txn-${Date.now()}`, description, entries };
+            processTransaction(transaction);
+            socket.emit('addTransaction', transaction); // Notify server
+            transactionModal.style.display = "none";
+        }
+
+        function processTransaction(transaction) {
+            transaction.entries.forEach(entry => {
+                const account = boxData.find(acc => acc.id === entry.accountId);
+                if (account) {
+                    const newEntry = { 
+                        id: `entry-${Date.now()}-${Math.random()}`, // Unique entry ID
+                        amount: entry.amount, 
+                        description: transaction.description 
+                    };
+                    if (entry.type === 'debit') {
+                        account.debits.push(newEntry);
+                        account.totalDebits += entry.amount;
+                    } else {
+                        account.credits.push(newEntry);
+                        account.totalCredits += entry.amount;
+                    }
+                }
+            });
+            renderTAccounts(); // Re-render to show changes
         }
 
         document.getElementById('addAccountBtn').addEventListener('click', addNewTAccount);
