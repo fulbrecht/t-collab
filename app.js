@@ -19,6 +19,9 @@ const svg = d3.select("body").append("svg")
 
 // Data array for all T-Accounts
 let boxData = [];
+// Array to store transactions (client-side)
+let transactions = [];
+
 
 // --- Helper function to build T-Account SVG elements ---
 function buildTAccountStructure(selection) {
@@ -139,24 +142,25 @@ function renderTAccounts() {
         const debitEntries = group.selectAll(".debit-entry-text")
             .data(d.debits, entry => entry.id); // Assuming entries will have unique IDs
         
-        debitEntries.enter().append("text")
+        const debitTexts = debitEntries.enter().append("text")
             .attr("class", "debit-entry-text") // Consider adding a general .entry-text class for common styles
             .attr("x", tAccountWidth / 4)
             .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15)) // Position below "Debits" label
             .merge(debitEntries) // Combine enter and update
             .text(entry => entry.amount.toFixed(2)); // Or entry.description
         debitEntries.exit().remove();
-
+        debitTexts.attr("data-transaction-id", entry => entry.transactionId); // Add transaction ID for highlighting
         // --- Render Credit Entries ---
         const creditEntries = group.selectAll(".credit-entry-text")
             .data(d.credits, entry => entry.id);
-        creditEntries.enter().append("text")
+        const creditTexts = creditEntries.enter().append("text")
             .attr("class", "credit-entry-text") // Consider adding a general .entry-text class
             .attr("x", (tAccountWidth / 4) * 3)
             .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15)) // Position below "Credits" label
             .merge(creditEntries)
             .text(entry => entry.amount.toFixed(2));
         creditEntries.exit().remove();
+        creditTexts.attr("data-transaction-id", entry => entry.transactionId); // Add transaction ID for highlighting
     });
 
     groups.attr("transform", d => `translate(${d.x}, ${d.y})`); // Ensure positions are correct
@@ -257,10 +261,7 @@ socket.on('transactionAdded', (transaction) => {
     // might send updated account data or we might need to re-fetch.
     // For a quick test, if the server sends all accounts, we can just update:
     // if (transaction.updatedAccounts) {
-    //     boxData = transaction.updatedAccounts;
-    //     renderTAccounts();
-    // }
-    // A more robust client-side processing of the transaction:
+    // A more robust client-side processing of the transaction:    
     if (transaction && transaction.entries) {
         processTransaction(transaction, false); // Process without re-emitting to server
     }
@@ -537,6 +538,7 @@ saveTransactionBtn.onclick = function() {
 
     const transaction = { id: `txn-${Date.now()}`, description, entries };
     processTransaction(transaction); // Process locally first
+    transactions.push(transaction); // Store transaction locally
     socket.emit('addTransaction', transaction); // Notify server
     transactionModal.style.display = "none";
 }
@@ -547,7 +549,8 @@ function processTransaction(transaction, emitToServer = true) { // Added emitToS
         if (account) {
             const newEntry = { 
                 id: `entry-${Date.now()}-${Math.random()}`, // Unique entry ID
-                amount: entry.amount, 
+                transactionId: transaction.id, // Link entry to transaction
+                amount: entry.amount,
                 description: transaction.description 
             };
             if (entry.type === 'debit') {
@@ -560,6 +563,7 @@ function processTransaction(transaction, emitToServer = true) { // Added emitToS
         }
     });
     renderTAccounts(); // Re-render to show changes
+    renderTransactionList(); // Update the transaction list display
     // Note: The original `processTransaction` didn't have an emitToServer flag.
     // The `saveTransactionBtn.onclick` handles the emit.
     // If `transactionAdded` socket event needs to call this, it should pass `false`.
@@ -568,3 +572,35 @@ function processTransaction(transaction, emitToServer = true) { // Added emitToS
 document.getElementById('addAccountBtn').addEventListener('click', addNewTAccount);
 document.getElementById('clearAccountsBtn').addEventListener('click', clearAllTAccounts);
 document.getElementById('arrangeAccountsBtn').addEventListener('click', arrangeTAccounts);
+
+// --- Transaction List Logic ---
+const transactionListUl = document.getElementById('transactionList');
+
+function renderTransactionList() {
+    transactionListUl.innerHTML = ''; // Clear existing list
+    transactions.forEach(txn => {
+        const listItem = document.createElement('li');
+        listItem.className = 'transaction-list-item';
+        listItem.textContent = txn.description || `Transaction ${txn.id}`;
+        listItem.setAttribute('data-transaction-id', txn.id);
+
+        listItem.addEventListener('mouseover', () => {
+            highlightTransactionEntries(txn.id, true);
+        });
+        listItem.addEventListener('mouseout', () => {
+            highlightTransactionEntries(txn.id, false);
+        });
+
+        transactionListUl.appendChild(listItem);
+    });
+}
+
+function highlightTransactionEntries(transactionId, shouldHighlight) {
+    svg.selectAll(".debit-entry-text, .credit-entry-text")
+        .filter(function() {
+            // In D3 v7, d3.select(this).attr('data-transaction-id') is fine.
+            // For older versions or direct DOM, it's this.dataset.transactionId
+            return d3.select(this).attr('data-transaction-id') === transactionId;
+        })
+        .classed("highlight-entry", shouldHighlight);
+}
