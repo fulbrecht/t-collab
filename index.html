@@ -227,14 +227,14 @@
 
             // "Total Debits" text (placeholder)
             selection.append("text")
-                .attr("class", "t-account-total-text")
+                .attr("class", "debit-total")
                 .attr("x", tAccountWidth / 4) // Keep x for general centering
                 .attr("y", tAccountHeight - totalsHeight / 2)
                 .text(d => `Total Dr: ${d.totalDebits.toFixed(2)}`);
 
             // "Total Credits" text (placeholder)
             selection.append("text")
-                .attr("class", "t-account-total-text")
+                .attr("class", "credit-total")
                 .attr("x", (tAccountWidth / 4) * 3) // Keep x for general centering
                 .attr("y", tAccountHeight - totalsHeight / 2)
                 .text(d => `Total Cr: ${d.totalCredits.toFixed(2)}`);
@@ -532,7 +532,7 @@
             }
 
         }
-        
+
         // --- Transaction Modal Logic ---
         const transactionModal = document.getElementById('transactionModal');
         const closeTransactionModalBtn = document.getElementById('closeTransactionModal');
@@ -541,7 +541,7 @@
         const saveTransactionBtn = document.getElementById('saveTransactionBtn');
         const transactionDescriptionInput = document.getElementById('transactionDescription');
         
-        // Button to open the modal (you'll need to add this button to your HTML)
+        // Button to open the modal
         const openTransactionModalBtn = document.createElement('button');
         openTransactionModalBtn.id = 'openTransactionModalBtn';
         openTransactionModalBtn.textContent = 'New Transaction';
