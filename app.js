@@ -279,6 +279,19 @@ socket.on('transactionAdded', (transaction) => {
     }
 });
 
+// Listen for a transaction being deleted by another client (via server)
+socket.on('transactionDeleted', (transactionId) => {
+    console.log('Received transactionDeleted from server for ID:', transactionId);
+    const index = transactions.findIndex(txn => txn.id === transactionId);
+    if (index > -1) {
+        reverseTransactionEffects(transactionId); // Reverse effects on T-accounts
+        transactions.splice(index, 1); // Remove from local transactions array
+        renderTransactionList(); // Update the transaction list UI
+        renderTAccounts(); // Re-render T-accounts to reflect changes
+        console.log(`Transaction ${transactionId} removed locally.`);
+    }
+});
+
 // --- End Socket.IO Integration ---
 
 // Define drag behavior
@@ -456,8 +469,8 @@ openTransactionModalBtn.onclick = function() {
     transactionModal.style.display = "block";
     transactionDescriptionInput.value = "";
     transactionEntriesContainer.innerHTML = ''; // Clear previous entries
-    addEntryRowToModal(); // Add one initial entry row
-    addEntryRowToModal(); // Add second initial entry row
+    addEntryRowToModal({amount: 100}); // Add one initial entry row
+    addEntryRowToModal({type: 'credit', amount: 100}); // Add second initial entry row
     updateModalTotals();
 }
 closeTransactionModalBtn.onclick = function() {
@@ -470,18 +483,27 @@ window.onclick = function(event) {
 }
 addTransactionEntryRowBtn.onclick = addEntryRowToModal;
 
-function addEntryRowToModal() {
+function addEntryRowToModal(defaults = {}) {
     const entryDiv = document.createElement('div');
     entryDiv.className = 'transaction-entry';
 
     const accountSelect = document.createElement('select');
     accountSelect.className = 'transaction-account';
+    if (boxData.length === 0 && !defaults.accountId) {
+        const option = document.createElement('option');
+        option.textContent = "No accounts available";
+        option.disabled = true;
+        accountSelect.appendChild(option);
+    }
     boxData.forEach(acc => {
         const option = document.createElement('option');
         option.value = acc.id;
         option.textContent = acc.title;
         accountSelect.appendChild(option);
     });
+
+    // Set default account if provided
+    if (defaults.accountId) accountSelect.value = defaults.accountId;
 
     const typeSelect = document.createElement('select');
     typeSelect.className = 'transaction-type';
@@ -492,12 +514,18 @@ function addEntryRowToModal() {
         typeSelect.appendChild(option);
     });
 
+    // Set default type if provided
+    if (defaults.type) typeSelect.value = defaults.type;
+
     const amountInput = document.createElement('input');
     amountInput.type = 'number';
     amountInput.className = 'transaction-amount';
     amountInput.placeholder = 'Amount';
     amountInput.min = '0.01';
     amountInput.step = '0.01';
+
+    // Set default amount if provided
+    if (defaults.amount) amountInput.value = defaults.amount;
 
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
@@ -609,6 +637,12 @@ function renderTransactionList() {
             highlightTransactionEntries(txn.id, false);
         });
 
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'X';
+        deleteBtn.className = 'transaction-delete-btn'; // Apply CSS class
+        deleteBtn.onclick = (event) => { event.stopPropagation(); handleDeleteTransaction(txn.id, txn.description); };
+        listItem.appendChild(deleteBtn);
+
         transactionListUl.appendChild(listItem);
     });
 }
@@ -621,4 +655,43 @@ function highlightTransactionEntries(transactionId, shouldHighlight) {
             return d3.select(this).attr('data-transaction-id') === transactionId;
         })
         .classed("highlight-entry", shouldHighlight);
+}
+
+function handleDeleteTransaction(transactionId, transactionDescription) {
+    if (confirm(`Are you sure you want to delete transaction: "${transactionDescription || transactionId}"?`)) {
+        // 1. Reverse effects on T-accounts locally
+        reverseTransactionEffects(transactionId);
+
+        // 2. Remove from local transactions array
+        const index = transactions.findIndex(txn => txn.id === transactionId);
+        if (index > -1) {
+            transactions.splice(index, 1);
+        }
+
+        // 3. Update UI
+        renderTransactionList();
+        renderTAccounts();
+
+        // 4. Notify server
+        socket.emit('deleteTransaction', transactionId);
+        console.log(`Transaction ${transactionId} deleted locally and request sent to server.`);
+    }
+}
+
+function reverseTransactionEffects(transactionId) {
+    const transaction = transactions.find(txn => txn.id === transactionId);
+    if (!transaction) return;
+
+    transaction.entries.forEach(entry => {
+        const account = boxData.find(acc => acc.id === entry.accountId);
+        if (account) {
+            if (entry.type === 'debit') {
+                account.debits = account.debits.filter(dEntry => dEntry.transactionId !== transactionId);
+                account.totalDebits -= entry.amount;
+            } else { // credit
+                account.credits = account.credits.filter(cEntry => cEntry.transactionId !== transactionId);
+                account.totalCredits -= entry.amount;
+            }
+        }
+    });
 }

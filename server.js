@@ -180,6 +180,36 @@ io.on('connection', (socket) => {
         console.log(`Transaction ${transaction.id} processed and broadcasted. Affected accounts: ${Array.from(accountsToUpdate).join(', ')}`);
     });
 
+    // Listen for a client deleting a transaction
+    socket.on('deleteTransaction', (transactionId) => {
+        console.log('Received deleteTransaction event for ID:', transactionId);
+
+        const transactionIndex = transactions.findIndex(txn => txn.id === transactionId);
+        if (transactionIndex === -1) {
+            console.warn(`Transaction with ID ${transactionId} not found on server.`);
+            return;
+        }
+
+        const transactionToDelete = transactions[transactionIndex];
+
+        // Reverse the effects of the transaction on accountsData
+        transactionToDelete.entries.forEach(entry => {
+            const account = accountsData[entry.accountId];
+            if (account) {
+                if (entry.type === 'debit') {
+                    account.debits = account.debits.filter(dEntry => dEntry.transactionId !== transactionId);
+                    account.totalDebits -= entry.amount;
+                } else { // credit
+                    account.credits = account.credits.filter(cEntry => cEntry.transactionId !== transactionId);
+                    account.totalCredits -= entry.amount;
+                }
+            }
+        });
+
+        transactions.splice(transactionIndex, 1); // Remove from server's transactions array
+        io.emit('transactionDeleted', transactionId); // Broadcast to all clients
+        console.log(`Transaction ${transactionId} deleted from server. Notified all clients.`);
+    });
 
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
