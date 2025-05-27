@@ -229,6 +229,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Listen for a client starting to highlight a transaction
+    socket.on('startHighlightTransaction', (data) => { // Expected data: { transactionId }
+        // console.log('Received startHighlightTransaction for ID:', data.transactionId);
+        // Broadcast to all OTHER clients to highlight this transaction
+        socket.broadcast.emit('highlightTransaction', { transactionId: data.transactionId, shouldHighlight: true });
+    });
+
+    // Listen for a client ending highlighting a transaction
+    socket.on('endHighlightTransaction', (data) => { // Expected data: { transactionId }
+        // console.log('Received endHighlightTransaction for ID:', data.transactionId);
+        // Broadcast to all OTHER clients to unhighlight this transaction
+        socket.broadcast.emit('unhighlightTransaction', { transactionId: data.transactionId, shouldHighlight: false });
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         // Optional: Implement cleanup or notification if a user disconnects,

@@ -154,7 +154,22 @@ svg {
     box-sizing: border-box;
     /* width is set inline in JS for now */
 }
-.highlight-entry {
-    fill: #FFD700 !important; /* Gold color for highlighting, !important to override existing fill */
+/* Local Highlight Styles (Yellow) */
+.local-highlight-list-item {
+    background-color: #fff3cd !important; /* Light yellow */
+    font-weight: bold;
+}
+
+.local-highlight-entry {
+    fill: #FFD700 !important; /* Gold/Yellow */
+    font-weight: bold;
+}
+/* Remote Highlight Styles (Blue) */
+.remote-highlight-list-item {
+    background-color: #d1ecf1 !important; /* Light blue */
+    font-weight: bold;
+}
+.remote-highlight-entry {
+    fill: #75b2dd !important; /* A distinct blue */
     font-weight: bold;
 }

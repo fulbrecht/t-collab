@@ -307,6 +307,19 @@ socket.on('transactionDescriptionUpdated', (data) => { // data = { transactionId
     }
 });
 
+// Listen for highlight events from other clients (via server)
+socket.on('highlightTransaction', (data) => { // data = { transactionId, shouldHighlight: boolean }
+    // console.log('Received remote highlightTransaction from server:', data);
+    highlightTransactionEntries(data.transactionId, data.shouldHighlight, 'remote');
+});
+
+socket.on('unhighlightTransaction', (data) => { // data = { transactionId, shouldHighlight: boolean } - shouldHighlight will be false
+    // console.log('Received remote unhighlightTransaction from server:', data);
+    // It's good practice to ensure shouldHighlight is false, or just call with false
+    highlightTransactionEntries(data.transactionId, false, 'remote'); // Type helps if specific removal is needed, though generic removal is fine
+});
+
+
 // --- End Socket.IO Integration ---
 
 // Define drag behavior
@@ -646,10 +659,12 @@ function renderTransactionList() {
         listItem.setAttribute('data-transaction-id', txn.id);
 
         listItem.addEventListener('mouseover', () => {
-            highlightTransactionEntries(txn.id, true);
+            socket.emit('startHighlightTransaction', { transactionId: txn.id });
+            highlightTransactionEntries(txn.id, true, 'local'); // Local highlight
         });
         listItem.addEventListener('mouseout', () => {
-            highlightTransactionEntries(txn.id, false);
+            socket.emit('endHighlightTransaction', { transactionId: txn.id });
+            highlightTransactionEntries(txn.id, false, 'local'); // Unhighlight local
         });
 
         listItem.addEventListener('dblclick', function(event) { // 'this' will be the listItem
@@ -669,14 +684,37 @@ function renderTransactionList() {
     });
 }
 
-function highlightTransactionEntries(transactionId, shouldHighlight) {
-    svg.selectAll(".debit-entry-text, .credit-entry-text")
+function highlightTransactionEntries(transactionId, shouldHighlight, highlightType = 'local') {
+    const entrySelector = ".debit-entry-text, .credit-entry-text";
+    const listItemSelector = '.transaction-list-item';
+
+    const localEntryClass = 'local-highlight-entry';
+    const remoteEntryClass = 'remote-highlight-entry';
+    const localListItemClass = 'local-highlight-list-item';
+    const remoteListItemClass = 'remote-highlight-list-item';
+
+    // Determine which classes to use
+    const entryClassToApply = highlightType === 'local' ? localEntryClass : remoteEntryClass;
+    const listItemClassToApply = highlightType === 'local' ? localListItemClass : remoteListItemClass;
+
+    // Clear all highlight classes first when unhighlighting or before applying a new one
+    if (!shouldHighlight) {
+        svg.selectAll(entrySelector).classed(localEntryClass, false).classed(remoteEntryClass, false);
+        d3.select(transactionListUl).selectAll(listItemSelector).classed(localListItemClass, false).classed(remoteListItemClass, false);
+    }
+
+    // Apply the specific highlight
+    svg.selectAll(entrySelector)
         .filter(function() {
-            // In D3 v7, d3.select(this).attr('data-transaction-id') is fine.
-            // For older versions or direct DOM, it's this.dataset.transactionId
             return d3.select(this).attr('data-transaction-id') === transactionId;
         })
-        .classed("highlight-entry", shouldHighlight);
+        .classed(entryClassToApply, shouldHighlight);
+
+    d3.select(transactionListUl).selectAll(listItemSelector)
+        .filter(function() {
+            return this.getAttribute('data-transaction-id') === transactionId;
+        })
+        .classed(listItemClassToApply, shouldHighlight);
 }
 
 function handleDeleteTransaction(transactionId, transactionDescription) {
