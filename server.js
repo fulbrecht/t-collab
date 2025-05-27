@@ -211,6 +211,24 @@ io.on('connection', (socket) => {
         console.log(`Transaction ${transactionId} deleted from server. Notified all clients.`);
     });
 
+    // Listen for a client editing a transaction's description
+    socket.on('editTransactionDescription', (data) => { // Expected data: { transactionId, newDescription }
+        console.log('Received editTransactionDescription event:', data);
+        if (data && data.transactionId && typeof data.newDescription === 'string') {
+            const transaction = transactions.find(txn => txn.id === data.transactionId);
+            if (transaction) {
+                transaction.description = data.newDescription;
+                // Broadcast the updated description to all OTHER clients
+                socket.broadcast.emit('transactionDescriptionUpdated', { transactionId: data.transactionId, newDescription: data.newDescription });
+                console.log(`Transaction ${data.transactionId} description updated to "${data.newDescription}". Notified other clients.`);
+            } else {
+                console.warn(`Transaction with ID ${data.transactionId} not found on server for description update.`);
+            }
+        } else {
+            console.warn('Invalid data received for editTransactionDescription event:', data);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         // Optional: Implement cleanup or notification if a user disconnects,

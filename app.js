@@ -142,25 +142,28 @@ function renderTAccounts() {
         const debitEntries = group.selectAll(".debit-entry-text")
             .data(d.debits, entry => entry.id); // Assuming entries will have unique IDs
         
-        const debitTexts = debitEntries.enter().append("text")
+        debitEntries.exit().remove(); // Remove old entries first
+
+        debitEntries.enter().append("text")
             .attr("class", "debit-entry-text") // Consider adding a general .entry-text class for common styles
             .attr("x", tAccountWidth / 4)
+            .merge(debitEntries) // Combine enter and update selections
             .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15)) // Position below "Debits" label
-            .merge(debitEntries) // Combine enter and update
-            .text(entry => entry.amount.toFixed(2)); // Or entry.description
-        debitEntries.exit().remove();
-        debitTexts.attr("data-transaction-id", entry => entry.transactionId); // Add transaction ID for highlighting
+            .text(entry => entry.amount.toFixed(2)) // Or entry.description
+            .attr("data-transaction-id", entry => entry.transactionId); // Add transaction ID for highlighting
+
         // --- Render Credit Entries ---
         const creditEntries = group.selectAll(".credit-entry-text")
             .data(d.credits, entry => entry.id);
-        const creditTexts = creditEntries.enter().append("text")
+        creditEntries.exit().remove(); // Remove old entries first
+
+        creditEntries.enter().append("text")
             .attr("class", "credit-entry-text") // Consider adding a general .entry-text class
             .attr("x", (tAccountWidth / 4) * 3)
+            .merge(creditEntries) // Combine enter and update selections
             .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15)) // Position below "Credits" label
-            .merge(creditEntries)
-            .text(entry => entry.amount.toFixed(2));
-        creditEntries.exit().remove();
-        creditTexts.attr("data-transaction-id", entry => entry.transactionId); // Add transaction ID for highlighting
+            .text(entry => entry.amount.toFixed(2))
+            .attr("data-transaction-id", entry => entry.transactionId); // Add transaction ID for highlighting
     });
 
     groups.attr("transform", d => `translate(${d.x}, ${d.y})`); // Ensure positions are correct
@@ -289,6 +292,18 @@ socket.on('transactionDeleted', (transactionId) => {
         renderTransactionList(); // Update the transaction list UI
         renderTAccounts(); // Re-render T-accounts to reflect changes
         console.log(`Transaction ${transactionId} removed locally.`);
+    }
+});
+
+// Listen for transaction description updates from other clients (via server)
+socket.on('transactionDescriptionUpdated', (data) => { // data = { transactionId, newDescription }
+    console.log('Received transactionDescriptionUpdated from server:', data);
+    const transaction = transactions.find(txn => txn.id === data.transactionId);
+    if (transaction) {
+        transaction.description = data.newDescription;
+        renderTransactionList(); // Re-render the list to show the updated description
+    } else {
+        console.warn(`Transaction with ID ${data.transactionId} not found locally for description update.`);
     }
 });
 
@@ -637,10 +652,17 @@ function renderTransactionList() {
             highlightTransactionEntries(txn.id, false);
         });
 
+        listItem.addEventListener('dblclick', function(event) { // 'this' will be the listItem
+            event.stopPropagation();
+            handleEditTransactionDescriptionInPlace(txn, this);
+        });
+
+
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = 'X';
         deleteBtn.className = 'transaction-delete-btn'; // Apply CSS class
         deleteBtn.onclick = (event) => { event.stopPropagation(); handleDeleteTransaction(txn.id, txn.description); };
+
         listItem.appendChild(deleteBtn);
 
         transactionListUl.appendChild(listItem);
@@ -676,6 +698,63 @@ function handleDeleteTransaction(transactionId, transactionDescription) {
         socket.emit('deleteTransaction', transactionId);
         console.log(`Transaction ${transactionId} deleted locally and request sent to server.`);
     }
+}
+
+function handleEditTransactionDescriptionInPlace(transactionData, listItemElement) {
+    const currentDescription = transactionData.description || `Transaction ${transactionData.id}`;
+    
+    // Prevent re-triggering if already in edit mode (e.g., by an input already present)
+    if (listItemElement.querySelector('input.transaction-description-edit-input')) {
+        return;
+    }
+
+    const originalHTML = listItemElement.innerHTML; // Save the original content
+    const deleteButtonHTML = listItemElement.querySelector('.transaction-delete-btn')?.outerHTML || ''; // Save delete button
+    listItemElement.innerHTML = ''; // Clear the list item
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentDescription;
+    input.className = 'transaction-description-edit-input'; // For styling
+    input.style.width = 'calc(100% - 10px)'; // Adjust width as needed, leave space for potential padding/border
+    input.style.boxSizing = 'border-box';
+
+    listItemElement.appendChild(input); // Add input to the now empty list item
+    input.focus();
+    input.select();
+
+    const saveChanges = () => {
+        const newDescription = input.value.trim();
+
+        // Restore original text display and buttons
+        listItemElement.innerHTML = ''; // Clear the input
+
+        if (newDescription !== currentDescription && newDescription !== "") {
+            transactionData.description = newDescription;
+            listItemElement.textContent = newDescription; // Set the new text
+            // Re-append the delete button (and any other controls you might have)
+            // This ensures event listeners on the delete button are preserved if re-created,
+            // or use a more robust way to re-attach if they were complex.
+            // For simplicity, if renderTransactionList re-creates everything, that's also fine.
+            // However, to just update this item:
+            listItemElement.insertAdjacentHTML('beforeend', deleteButtonHTML);
+            // Re-attach listeners if needed, or rely on renderTransactionList for full refresh.
+            // For now, let's call renderTransactionList to ensure all listeners are correctly re-bound.
+            renderTransactionList(); 
+            socket.emit('editTransactionDescription', { transactionId: transactionData.id, newDescription: newDescription });
+            console.log(`Transaction ${transactionData.id} description updated to "${newDescription}".`);
+        } else {
+            // If no change or empty, revert to original by re-rendering the list
+            renderTransactionList();
+        }
+    };
+
+    input.addEventListener('blur', saveChanges);
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            input.blur(); // Trigger blur to save
+        }
+    });
 }
 
 function reverseTransactionEffects(transactionId) {

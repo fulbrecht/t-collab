@@ -138,6 +138,22 @@ svg {
     padding: 0 5px;   /* Add some padding for easier clicking */
     font-size: 1.1em; /* Slightly larger 'X' */
 }
+.transaction-edit-btn {
+    color: #3498DB; /* A blue color for edit */
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0 5px;
+    margin-right: 5px; /* Space between edit and delete buttons */
+}
+.transaction-description-edit-input {
+    font-family: inherit; /* Match list item font */
+    font-size: inherit;   /* Match list item font size */
+    padding: 3px;         /* A little padding */
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    /* width is set inline in JS for now */
+}
 .highlight-entry {
     fill: #FFD700 !important; /* Gold color for highlighting, !important to override existing fill */
     font-weight: bold;
