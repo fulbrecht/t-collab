@@ -24,6 +24,7 @@ app.get('/', (req, res) => {
 let accountsData = {};
 // In-memory store for transactions
 let transactions = [];
+let connectedUsers = 0;
 
 
 io.on('connection', (socket) => {
@@ -34,6 +35,10 @@ io.on('connection', (socket) => {
     socket.emit('initialAccounts', Object.values(accountsData));
     // Send existing transactions to the newly connected client
     socket.emit('initialTransactions', transactions);
+
+    connectedUsers++;
+    io.emit('userCountUpdate', connectedUsers); // Broadcast new count to all
+    console.log(`User count: ${connectedUsers}`);
 
     // Listen for a new account being added by a client
     socket.on('addAccount', (newAccountData) => {
@@ -243,8 +248,35 @@ io.on('connection', (socket) => {
         socket.broadcast.emit('unhighlightTransaction', { transactionId: data.transactionId, shouldHighlight: false });
     });
 
+    // Listen for a client importing a new state
+    socket.on('stateImported', (importedData) => {
+        console.log('Received stateImported event from client:', socket.id);
+        if (importedData && Array.isArray(importedData.accounts) && Array.isArray(importedData.transactions)) {
+            // Replace server's state
+            const newAccountsData = {};
+            importedData.accounts.forEach(account => {
+                if (account && account.id) {
+                    newAccountsData[account.id] = account;
+                }
+            });
+            accountsData = newAccountsData;
+            transactions = importedData.transactions;
+
+            // Broadcast the new complete state to ALL clients
+            io.emit('initialAccounts', Object.values(accountsData)); // Send updated accounts
+            io.emit('initialTransactions', transactions); // Send updated transactions
+            // Optionally, could also send userCountUpdate if that's part of the state, though it's managed live.
+            console.log('Server state updated from import. Broadcasted to all clients.');
+        } else {
+            console.warn('Received invalid data for stateImported event from client:', socket.id);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
+        connectedUsers--;
+        io.emit('userCountUpdate', connectedUsers); // Broadcast new count to all
+        console.log(`User count: ${connectedUsers}`);
         // Optional: Implement cleanup or notification if a user disconnects,
         // e.g., if accounts were tied to users, but for this scenario, it's likely not needed.
     });
