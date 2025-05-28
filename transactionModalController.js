@@ -59,12 +59,7 @@ function updateModalTotals() {
 }
 
 export function initializeTransactionModal() {
-    const openTransactionModalBtn = document.createElement('button');
-    openTransactionModalBtn.id = 'openTransactionModalBtn';
-    openTransactionModalBtn.textContent = 'New Transaction';
-    dom.buttonContainer.appendChild(openTransactionModalBtn);
-
-    openTransactionModalBtn.onclick = () => {
+    dom.openTransactionModalBtnEl.onclick = () => {
         dom.transactionModal.style.display = "block";
         dom.transactionDescriptionInput.value = "";
         dom.transactionEntriesContainer.innerHTML = '';

@@ -3,6 +3,9 @@ import * as state from './state.js';
 import { renderTAccounts, buildTAccountStructure } from './tAccountRenderer.js';
 import { renderTransactionList } from './transactionRenderer.js';
 import { svgWidth, tAccountWidth, tAccountHeight } from './config.js';
+import { reverseTransactionEffects } from './transactionActions.js';
+
+
 
 export function addNewTAccount() {
     const newId = `tAcc-${Date.now()}`;
@@ -24,14 +27,45 @@ export function addNewTAccount() {
 }
 
 export function deleteAccount(accountId) {
-    const account = state.findAccountById(accountId);
-    if (account) {
-        const deletedAccountTitle = account.title;
-        state.setBoxData(state.getAccounts().filter(acc => acc.id !== accountId));
-        renderTAccounts();
-        socket.emit('deleteAccount', accountId);
-        console.log(`Account "${deletedAccountTitle}" (ID: ${accountId}) deleted locally and request sent to server.`);
+    const accountToDelete = state.findAccountById(accountId);
+    if (!accountToDelete) {
+        console.warn(`Attempted to delete non-existent account: ${accountId}`);
+        return;
     }
+
+    const deletedAccountTitle = accountToDelete.title;
+    const transactionsToDeleteIds = [];
+
+    // Iterate over a copy of transactions to safely modify the original or identify for deletion
+    const currentTransactions = [...state.getTransactions()]; 
+    const remainingTransactions = [];
+
+    currentTransactions.forEach(txn => {
+        const isRelated = txn.entries.some(entry => entry.accountId === accountId);
+        if (isRelated) {
+            transactionsToDeleteIds.push(txn.id);
+            // Reverse the effects of this transaction on ALL its accounts
+            // as the transaction itself is being removed from the system.
+            reverseTransactionEffects(txn.id); // This modifies boxData totals and entries
+        } else {
+            remainingTransactions.push(txn);
+        }
+    });
+
+    // Update the global state
+    state.setTransactions(remainingTransactions);
+    state.setBoxData(state.getAccounts().filter(acc => acc.id !== accountId));
+
+    // Re-render UI
+    renderTAccounts(); // Reflects updated account balances and removed account
+    renderTransactionList(); // Reflects removed transactions
+
+    // Notify server about the account deletion.
+    // The server will perform its own cascading delete for transactions
+    // and then broadcast appropriate updates (accountDeleted, transactionDeleted).
+    socket.emit('deleteAccount', accountId);
+
+    console.log(`Account "${deletedAccountTitle}" (ID: ${accountId}) and ${transactionsToDeleteIds.length} related transaction(s) deleted locally. Account deletion request sent to server.`);
 }
 
 export function clearAllData() {

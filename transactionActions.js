@@ -47,14 +47,12 @@ export function reverseTransactionEffects(transactionId) {
 }
 
 export function handleDeleteTransaction(transactionId, transactionDescription) {
-    if (confirm(`Are you sure you want to delete transaction: "${transactionDescription || transactionId}"?`)) {
-        reverseTransactionEffects(transactionId);
-        state.removeTransactionById(transactionId);
-        renderTransactionList();
-        renderTAccounts();
-        socket.emit('deleteTransaction', transactionId);
-        console.log(`Transaction ${transactionId} deleted locally and request sent to server.`);
-    }
+    reverseTransactionEffects(transactionId);
+    state.removeTransactionById(transactionId);
+    renderTransactionList();
+    renderTAccounts();
+    socket.emit('deleteTransaction', transactionId);
+    console.log(`Transaction ${transactionId} deleted locally and request sent to server.`);
 }
 
 export function handleEditTransactionDescriptionInPlace(transactionData, listItemElement) {

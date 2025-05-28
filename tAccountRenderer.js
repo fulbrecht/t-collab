@@ -43,7 +43,7 @@ export function buildTAccountStructure(selection) {
         .text("X")
         .on("click", function(event, d) {
             event.stopPropagation();
-            if (confirm(`Are you sure you want to delete account "${d.title}"?`)) {
+            if (confirm(`Delete account "${d.title}"? This will also delete all related transactions.`)) {
                 deleteAccount(d.id);
             }
         });

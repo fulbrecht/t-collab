@@ -13,3 +13,7 @@ export const modalTotalCreditsEl = document.getElementById('modalTotalCredits');
 export const addAccountBtnEl = document.getElementById('addAccountBtn');
 export const clearAllBtnEl = document.getElementById('clearAllBtn');
 export const arrangeAccountsBtnEl = document.getElementById('arrangeAccountsBtn');
+export const openTransactionModalBtnEl = document.getElementById('openTransactionModalBtn');
+export const exportBtnEl = document.getElementById('exportBtn');
+export const importBtnEl = document.getElementById('importBtn');
+

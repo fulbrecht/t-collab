@@ -282,6 +282,12 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+
+// Start the server only if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+    server.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+    });
+}
+
+module.exports = { app, server, io, accountsData, transactions }; // Export for testing
