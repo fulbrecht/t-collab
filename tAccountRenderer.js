@@ -3,6 +3,8 @@ import * as state from './state.js';
 import { tAccountWidth, tAccountHeight, headerHeight, totalsHeight, columnLabelYOffset } from './config.js';
 import { dragBehavior } from './dragController.js';
 import { showRenameInput, deleteAccount } from './tAccountActions.js'; // Forward declaration, will be defined
+import { highlightTransactionEntries } from './transactionRenderer.js'; // Import for highlighting
+import { socket } from './socketService.js'; // Import for emitting highlight events
 
 export function buildTAccountStructure(selection) {
     selection.append("rect")
@@ -106,8 +108,18 @@ export function renderTAccounts() {
             .merge(debitEntries)
             .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15))
             .text(entry => entry.amount.toFixed(2))
-            .attr("data-transaction-id", entry => entry.transactionId);
-
+            .attr("data-transaction-id", entry => entry.transactionId)
+            .style("pointer-events", "auto") // Apply to merged selection
+            .style("cursor", "default")      // Apply to merged selection
+            .on('mouseover', function(event, entry) {
+                socket.emit('startHighlightTransaction', { transactionId: entry.transactionId });
+                highlightTransactionEntries(entry.transactionId, true, 'local');
+            })
+            .on('mouseout', function(event, entry) {
+                socket.emit('endHighlightTransaction', { transactionId: entry.transactionId });
+                highlightTransactionEntries(entry.transactionId, false, 'local');
+            });
+            
         const creditEntries = group.selectAll(".credit-entry-text").data(d.credits, entry => entry.id);
         creditEntries.exit().remove();
         creditEntries.enter().append("text")
@@ -116,7 +128,17 @@ export function renderTAccounts() {
             .merge(creditEntries)
             .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15))
             .text(entry => entry.amount.toFixed(2))
-            .attr("data-transaction-id", entry => entry.transactionId);
+            .attr("data-transaction-id", entry => entry.transactionId)
+            .style("pointer-events", "auto") // Apply to merged selection
+            .style("cursor", "default")      // Apply to merged selection
+            .on('mouseover', function(event, entry) {
+                socket.emit('startHighlightTransaction', { transactionId: entry.transactionId });
+                highlightTransactionEntries(entry.transactionId, true, 'local');
+            })
+            .on('mouseout', function(event, entry) {
+                socket.emit('endHighlightTransaction', { transactionId: entry.transactionId });
+                highlightTransactionEntries(entry.transactionId, false, 'local');
+            });
     });
     groups.attr("transform", d => `translate(${d.x}, ${d.y})`);
 }

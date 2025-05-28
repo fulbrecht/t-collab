@@ -28,7 +28,7 @@ function addEntryRowToModal(defaults = {}) {
         typeSelect.appendChild(option);
     });
     if (defaults.type) typeSelect.value = defaults.type;
-    else typeSelect.value = 'credit'; // Default to Credit
+    else typeSelect.value = 'debit'; // Default to Debit
 
     const amountInput = document.createElement('input');
     amountInput.type = 'number'; amountInput.className = 'transaction-amount';
