@@ -30,7 +30,10 @@ io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
     // Determine the session ID from query parameters or use default
-    const sessionId = socket.handshake.query.sessionId || DEFAULT_SESSION_ID;
+    let sessionId = socket.handshake.query.sessionId;
+    if (!sessionId || sessionId === 'null' || sessionId === 'undefined') { // More robust check
+        sessionId = DEFAULT_SESSION_ID;
+    }
     console.log(`User ${socket.id} connecting to session: ${sessionId}`);
 
     // Join the socket to the session room
@@ -40,7 +43,7 @@ io.on('connection', (socket) => {
     if (!sessions[sessionId]) {
         sessions[sessionId] = {
             accountsData: {},
-            title: `Session: ${sessionId === DEFAULT_SESSION_ID ? "Default" : sessionId}`, // Default title
+            title: sessionId === DEFAULT_SESSION_ID ? "T-Collab" : sessionId, // Default title
             transactions: [],
             connectedUsers: 0,
         };
@@ -319,7 +322,10 @@ io.on('connection', (socket) => {
         // Decrement session user count and potentially clean up session if empty
         // The session ID was stored when the socket connected. We should retrieve it.
         // A simple way is to re-evaluate, but ideally, it's stored on the socket object.
-        const userSessionId = socket.handshake.query.sessionId || DEFAULT_SESSION_ID; 
+        let userSessionId = socket.handshake.query.sessionId;
+        if (!userSessionId || userSessionId === 'null' || userSessionId === 'undefined') {
+            userSessionId = DEFAULT_SESSION_ID;
+        }
         if (userSessionId && sessions[userSessionId]) {
             sessions[userSessionId].connectedUsers--;
             console.log(`User disconnected from session ${userSessionId}. Users remaining in session: ${sessions[userSessionId].connectedUsers}`);            if (sessions[userSessionId].connectedUsers <= 0) {
