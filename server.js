@@ -6,7 +6,7 @@ const { Socket } = require('dgram');
 
 
 // In-memory store for all session data
-// Structure: { sessionId: { accountsData: { accountId: {...} }, transactions: [...], connectedUsers: N } }
+// Structure: { sessionId: { title: "Session Title", accountsData: { accountId: {...} }, transactions: [...], connectedUsers: N } }
 let sessions = {};
 
 const app = express();
@@ -40,6 +40,7 @@ io.on('connection', (socket) => {
     if (!sessions[sessionId]) {
         sessions[sessionId] = {
             accountsData: {},
+            title: `Session: ${sessionId === DEFAULT_SESSION_ID ? "Default" : sessionId}`, // Default title
             transactions: [],
             connectedUsers: 0,
         };
@@ -49,6 +50,8 @@ io.on('connection', (socket) => {
     const session = sessions[sessionId];
 
     // Send the current state of all accounts to the newly connected client
+    // Also send the current session title
+    socket.emit('initialSessionTitle', session.title);
     socket.emit('initialAccounts', Object.values(session.accountsData));
     // Send existing transactions to the newly connected client
     socket.emit('initialTransactions', session.transactions);
@@ -59,6 +62,18 @@ io.on('connection', (socket) => {
     io.emit('userCountUpdate', connectedUsers); // Broadcast new count to all
     console.log(`Global user count: ${connectedUsers}, Session ${sessionId} user count: ${session.connectedUsers}`);
 
+    // Listen for session title updates
+    socket.on('updateSessionTitle', (newTitle) => {
+        if (typeof newTitle === 'string' && session) {
+            session.title = newTitle.trim();
+            console.log(`Session ${sessionId} title updated to: "${session.title}" by ${socket.id}`);
+            // Broadcast to all clients in the session, including the sender,
+            // so everyone is in sync and the sender gets confirmation via the 'sessionTitleUpdated' event.
+            io.to(sessionId).emit('sessionTitleUpdated', session.title);
+        } else {
+            console.warn(`Invalid title update received for session ${sessionId}:`, newTitle);
+        }
+    });
     // Listen for a new account being added by a client
     socket.on('addAccount', (newAccountData) => {
         console.log('Received addAccount event with data:', newAccountData);
@@ -278,10 +293,14 @@ io.on('connection', (socket) => {
                     newAccountsData[account.id] = account;
                 }
             });
+            if (importedData.sessionTitle) {
+                session.title = importedData.sessionTitle;
+            }
             session.accountsData = newAccountsData;
             session.transactions = importedData.transactions;
 
             // Broadcast the new complete state to ALL clients IN THIS SESSION
+            io.to(sessionId).emit('initialSessionTitle', session.title); // Send updated title)
             io.to(sessionId).emit('initialAccounts', Object.values(session.accountsData)); // Send updated accounts
             io.to(sessionId).emit('initialTransactions', session.transactions); // Send updated transactions
             // Optionally, could also send userCountUpdate if that's part of the state, though it's managed live.

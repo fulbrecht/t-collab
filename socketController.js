@@ -4,8 +4,20 @@ import { svg, userCountText } from './svgService.js';
 import { renderTAccounts } from './tAccountRenderer.js';
 import { renderTransactionList, highlightTransactionEntries } from './transactionRenderer.js';
 import { processTransaction, reverseTransactionEffects } from './transactionActions.js';
+import { sessionTitleElement } from './domElements.js';
 
 export function initializeSocketHandlers() {
+
+    socket.on('initialSessionTitle', (serverTitle) => {
+        console.log('Received initial title:', serverTitle);
+        state.setSessionTitle(serverTitle);
+        if (document.activeElement !== sessionTitleElement) {
+            sessionTitleElement.textContent = serverTitle;
+        } else {
+            console.log("Session title updated by another user, but current user is editing. Local changes preserved for now.");
+        }
+    });
+
     socket.on('initialAccounts', (serverAccounts) => {
         console.log('Received initial accounts:', serverAccounts);
         state.setBoxData(serverAccounts);
@@ -81,4 +93,9 @@ export function initializeSocketHandlers() {
     socket.on('highlightTransaction', (data) => highlightTransactionEntries(data.transactionId, data.shouldHighlight, 'remote'));
     socket.on('unhighlightTransaction', (data) => highlightTransactionEntries(data.transactionId, false, 'remote'));
     socket.on('userCountUpdate', (count) => { if (userCountText) userCountText.text(`Users: ${count}`); });
+
+
+
 }
+
+

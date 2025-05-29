@@ -1,5 +1,11 @@
 export let boxData = [];
 export let transactions = [];
+export let sessionTitle = "";
+
+export function setSessionTitle(newTitle) {
+    sessionTitle = newTitle;
+}
+
 
 export function setBoxData(newData) {
     boxData = newData;
@@ -32,3 +38,4 @@ export function findAccountById(accountId) {
 
 export function getAccounts() { return boxData; }
 export function getTransactions() { return transactions; }
+export function getTitle() { return sessionTitle; }

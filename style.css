@@ -27,6 +27,29 @@ header.main-header { /* Give your header a class, e.g., class="main-header" */
     justify-content: center;
     gap: 10px;
 }
+
+/* Session Title Styles */
+h2#sessionTitle {
+    font-size: 2em; /* Prominent title size */
+    font-weight: 600;
+    color: #2c3e50; /* Dark, readable color, consistent with other text */
+    margin-top: 15px; /* Space below the fixed header area */
+    margin-bottom: 20px; /* Space above the main controls */
+    padding: 8px 15px; /* Some padding around the text */
+    border: 1px dashed transparent; /* Invisible border, shows on focus/hover for editability cue */
+    border-radius: 6px;
+    min-width: 200px; /* Ensures it has some width even if empty, helps with centering */
+    max-width: 80%; /* Prevents it from becoming too wide on large screens */
+    text-align: center; /* Ensures text within the element is centered */
+    cursor: text; /* Indicates it's editable */
+    outline: none; /* Removes default browser outline on focus, as we use border */
+}
+
+h2#sessionTitle:hover,
+h2#sessionTitle:focus {
+    border: 1px dashed #7f8c8d; /* Visible border when hovered or editing */
+    background-color: #ffffff; /* Slightly different background when active */
+}
 .draggable-group {
     cursor: grab;
 }
