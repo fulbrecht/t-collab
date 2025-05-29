@@ -16,11 +16,11 @@ const DEFAULT_SESSION_ID = 'default'; // A default session if none is provided
 const PORT = process.env.PORT || 3000;
 
 // Serve static files (HTML, CSS, client-side JS) from the current directory
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve the HTML file from the root directory
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // In-memory store for T-account data

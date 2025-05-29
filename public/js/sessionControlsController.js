@@ -99,7 +99,7 @@ export function initializeSessionControls() {
     } else {
         console.warn("Session title element ('sessionTitle') not found. This feature will be unavailable.");
     }
-    
+
     if (socket) {
         // When the server sends the initial title (e.g., upon connection)
         socket.on('initialSessionTitle', (title) => { // Or whatever event your server sends
