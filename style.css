@@ -15,11 +15,13 @@ header.main-header { /* Give your header a class, e.g., class="main-header" */
     left: 0;
     width: 100%;
     background-color: #f0f0f0;
-    padding: 10px;
-    text-align: right;
+    padding: 10px 20px; /* Added more horizontal padding for better spacing */
     border-bottom: 1px solid #ccc;
     z-index: 1000;
     box-sizing: border-box;
+    display: flex; /* Use flexbox for layout */
+    justify-content: space-between; /* Pushes child divs to opposite ends */
+    align-items: center; /* Vertically aligns items in the center */
 }
 .main-controls { /* Give your main button container a class */
     margin-bottom: 10px;

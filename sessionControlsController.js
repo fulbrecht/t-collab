@@ -3,7 +3,9 @@ import {
     sessionNameInput,
     joinSessionBtn,
     copySessionLinkBtn,
-    sessionTitleElement
+    sessionTitleElement,
+    homeBtn,
+    currentSessionNameLabel
 } from './domElements.js';
 
 function navigateToSession() {
@@ -17,6 +19,14 @@ function navigateToSession() {
 }
 
 export function initializeSessionControls() {
+
+
+    if (homeBtn) {
+        homeBtn.addEventListener('click', () => {
+            window.location.href = window.location.origin;
+        });
+    }
+
     // Setup for session input and join button
     if (sessionNameInput && joinSessionBtn) {
         const urlParams = new URLSearchParams(window.location.search);
@@ -88,5 +98,28 @@ export function initializeSessionControls() {
         }
     } else {
         console.warn("Session title element ('sessionTitle') not found. This feature will be unavailable.");
+    }
+    
+    if (socket) {
+        // When the server sends the initial title (e.g., upon connection)
+        socket.on('initialSessionTitle', (title) => { // Or whatever event your server sends
+            if (currentSessionNameLabel) {
+                currentSessionNameLabel.textContent = title;
+            }
+            // Also update the main H2 title if it's still showing loading text
+            if (sessionTitleElement && (sessionTitleElement.textContent.trim() === "Loading Session Title..." || !sessionTitleElement.textContent.trim())) {
+                sessionTitleElement.textContent = title;
+            }
+        });
+
+        // When the session title is updated by any means (e.g., user edit, import)
+        socket.on('sessionTitleUpdated', (newTitle) => {
+            if (sessionTitleElement && document.activeElement !== sessionTitleElement) {
+                sessionTitleElement.textContent = newTitle;
+            }
+            if (currentSessionNameLabel) {
+                currentSessionNameLabel.textContent = newTitle;
+            }
+        });
     }
 }

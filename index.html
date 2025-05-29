@@ -6,12 +6,18 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header class="main-header">
-        <label for="sessionNameInput" style="margin-right: 10px;">Session Name:</label>
-        <input type="text" id="sessionNameInput" placeholder="Enter session name">
-        <button id="joinSessionBtn" style="margin-left: 10px;">Join Session</button>
-        <button id="copySessionLinkBtn" style="margin-left: 10px;">Copy Link</button>
-
+    <header class="main-header"> <!-- Using class for styling from style.css -->
+        <div> <!-- Left section of header -->
+            <button id="homeBtn" style="margin-right: 15px;">Home</button>
+            <span style="font-weight: bold;">Current Session:</span>
+            <span id="currentSessionNameLabel" style="margin-left: 5px;">Loading...</span>
+            <button id="copySessionLinkBtn" style="margin-left: 10px;">Copy Link</button>
+        </div>
+        <div> <!-- Right section of header -->
+            <!-- <label for="sessionNameInput" style="margin-right: 10px;">Session Name:</label> -->
+            <input type="text" id="sessionNameInput" placeholder="Enter session name">
+            <button id="joinSessionBtn" style="margin-left: 10px;">Join Session</button>
+        </div>
     </header>
     <!-- In index.html, inside <body>, before <div class="main-controls"> -->
     <h2 id="sessionTitle" contenteditable="true" style="text-align: center;">Loading Session Title...</h2>

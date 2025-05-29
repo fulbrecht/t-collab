@@ -22,6 +22,8 @@ export const exportBtnEl = document.getElementById('exportBtn');
 export const importBtnEl = document.getElementById('importBtn');
 
 //Session Elements
+export const homeBtn = document.getElementById('homeBtn');
+export const currentSessionNameLabel = document.getElementById('currentSessionNameLabel');
 export const sessionNameInput = document.getElementById('sessionNameInput');
 export const joinSessionBtn = document.getElementById('joinSessionBtn');
 export const copySessionLinkBtn = document.getElementById('copySessionLinkBtn');
