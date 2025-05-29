@@ -1,5 +1,6 @@
 body {
     margin: 0;
+    padding-top: 60px; /* Space for the fixed header */
     flex-direction: column; /* Stack children vertically */
     display: flex;
     justify-content: center;
@@ -7,6 +8,24 @@ body {
     min-height: 100vh;
     background-color: #f0f0f0;
     font-family: sans-serif;
+}
+header.main-header { /* Give your header a class, e.g., class="main-header" */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #f0f0f0;
+    padding: 10px;
+    text-align: right;
+    border-bottom: 1px solid #ccc;
+    z-index: 1000;
+    box-sizing: border-box;
+}
+.main-controls { /* Give your main button container a class */
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
 }
 .draggable-group {
     cursor: grab;

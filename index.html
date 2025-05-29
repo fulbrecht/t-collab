@@ -6,8 +6,15 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <header class="main-header">
+        <label for="sessionNameInput" style="margin-right: 10px;">Session Name:</label>
+        <input type="text" id="sessionNameInput" placeholder="Enter session name">
+        <button id="joinSessionBtn" style="margin-left: 10px;">Join Session</button>
+        <button id="copySessionLinkBtn" style="margin-left: 10px;">Copy Link</button>
 
-    <div style="margin-bottom: 10px; display: flex; justify-content: center; gap: 10px;">
+    </header>
+
+    <div class="main-controls">
         <button id="addAccountBtn">Add New T-Account</button>
         <button id="arrangeAccountsBtn">Arrange Accounts</button>
         <button id="clearAllBtn">Clear All</button>
@@ -16,7 +23,6 @@
         <button id="importBtn">Import Data</button>
     </div>
 
-    </div>
     <!-- Transaction List Container -->
     <div id="transactionListContainer" class="transaction-list-container">
         <h4>Transactions:</h4>
