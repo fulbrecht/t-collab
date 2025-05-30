@@ -62,8 +62,9 @@ io.on('connection', (socket) => {
     // Increment global and session-specific user counts
     connectedUsers++;
     session.connectedUsers++;
-    io.emit('userCountUpdate', connectedUsers); // Broadcast new count to all
-    console.log(`Global user count: ${connectedUsers}, Session ${sessionId} user count: ${session.connectedUsers}`);
+    // Broadcast the session-specific user count to clients in this session
+    io.to(sessionId).emit('userCountUpdate', session.connectedUsers);
+    console.log(`Global user count: ${connectedUsers}, Session '${sessionId}' user count: ${session.connectedUsers}`);
 
     // Listen for session title updates
     socket.on('updateSessionTitle', (newTitle) => {
@@ -316,16 +317,15 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         connectedUsers--; // Decrement global count
-        io.emit('userCountUpdate', connectedUsers); // Broadcast new global count to all
         console.log(`Global user count: ${connectedUsers}`);
 
         // Decrement session user count and potentially clean up session if empty
-        // The session ID was stored when the socket connected. We should retrieve it.
-        // A simple way is to re-evaluate, but ideally, it's stored on the socket object.
+        // Retrieve the session ID the user was part of.
         let userSessionId = socket.handshake.query.sessionId;
         if (!userSessionId || userSessionId === 'null' || userSessionId === 'undefined') {
             userSessionId = DEFAULT_SESSION_ID;
         }
+
         if (userSessionId && sessions[userSessionId]) {
             sessions[userSessionId].connectedUsers--;
             console.log(`User disconnected from session ${userSessionId}. Users remaining in session: ${sessions[userSessionId].connectedUsers}`);            if (sessions[userSessionId].connectedUsers <= 0) {
@@ -333,6 +333,8 @@ io.on('connection', (socket) => {
                 // delete sessions[userSessionId];
                 // console.log(`Session ${userSessionId} is now empty.`);
             }
+            // Broadcast the updated session-specific user count to clients in that session
+            io.to(userSessionId).emit('userCountUpdate', sessions[userSessionId].connectedUsers);
         }
     });
 });

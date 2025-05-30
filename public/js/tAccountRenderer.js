@@ -32,7 +32,7 @@ export function buildTAccountStructure(selection) {
     selection.append("line")
         .attr("class", "t-account-line")
         .attr("x1", tAccountWidth / 2).attr("y1", headerHeight)
-        .attr("x2", tAccountWidth / 2).attr("y2", tAccountHeight - totalsHeight);
+        .attr("x2", tAccountWidth / 2).attr("y2", tAccountHeight);
 
     selection.append("text")
         .attr("class", "delete-account-btn")
@@ -71,13 +71,13 @@ export function buildTAccountStructure(selection) {
         .attr("class", "debit-total t-account-total-text")
         .attr("x", tAccountWidth / 4)
         .attr("y", tAccountHeight - totalsHeight / 2)
-        .text(d => `Total Dr: ${d.totalDebits.toFixed(2)}`);
+        .text("");
 
     selection.append("text")
         .attr("class", "credit-total t-account-total-text")
         .attr("x", (tAccountWidth / 4) * 3)
         .attr("y", tAccountHeight - totalsHeight / 2)
-        .text(d => `Total Cr: ${d.totalCredits.toFixed(2)}`);
+        .text("");
 }
 
 export function renderTAccounts() {
@@ -97,8 +97,13 @@ export function renderTAccounts() {
     const allGroups = groups.merge(newGroups);
     allGroups.each(function(d) {
         const group = d3.select(this);
-        group.select(".debit-total").text(`Total Dr: ${d.totalDebits.toFixed(2)}`);
-        group.select(".credit-total").text(`Total Cr: ${d.totalCredits.toFixed(2)}`);
+        const netTotal = d.totalDebits - d.totalCredits;
+        if(netTotal > 0){
+            group.select(".debit-total").text(`${netTotal.toFixed(2)}`);
+        } else if(netTotal < 0){
+            group.select(".credit-total").text(`${(-netTotal).toFixed(2)}`);
+        } 
+        
 
         const debitEntries = group.selectAll(".debit-entry-text").data(d.debits, entry => entry.id);
         debitEntries.exit().remove();
