@@ -75,11 +75,17 @@ io.on('connection', (socket) => {
     if (!sessions[sessionId]) {
         sessions[sessionId] = {
             accountsData: {},
-            title: sessionId === DEFAULT_SESSION_ID ? "T-Collab" : sessionId, // Default title
+            title: sessionId === DEFAULT_SESSION_ID ? "T-Collab" : `Untitled: ${sessionId}`, // Default title
             transactions: [],
             connectedUsers: 0,
         };
         console.log(`Initialized new session: ${sessionId}`);
+        // When a new session is created, broadcast the updated list of all active sessions
+        const updatedActiveSessions = Object.keys(sessions).map(sId => ({
+            id: sId,
+            title: sessions[sId].title
+        }));
+        io.emit('activeSessionsList', updatedActiveSessions); // Broadcast to all clients
     }
 
     const session = sessions[sessionId];
@@ -90,6 +96,12 @@ io.on('connection', (socket) => {
     socket.emit('initialAccounts', Object.values(session.accountsData));
     // Send existing transactions to the newly connected client
     socket.emit('initialTransactions', session.transactions);
+    // Send the list of all active sessions to the newly connected client
+    const activeSessions = Object.keys(sessions).map(sId => ({
+        id: sId,
+        title: sessions[sId].title
+    }));
+    socket.emit('activeSessionsList', activeSessions);
 
     // Increment global and session-specific user counts
     connectedUsers++;
@@ -106,6 +118,12 @@ io.on('connection', (socket) => {
             // Broadcast to all clients in the session, including the sender,
             // so everyone is in sync and the sender gets confirmation via the 'sessionTitleUpdated' event.
             io.to(sessionId).emit('sessionTitleUpdated', session.title);
+            // Also broadcast the updated list of all active sessions so dropdowns can refresh titles
+            const updatedActiveSessions = Object.keys(sessions).map(sId => ({
+                id: sId,
+                title: sessions[sId].title
+            }));
+            io.emit('activeSessionsList', updatedActiveSessions); // Broadcast to all clients
         } else {
             console.warn(`Invalid title update received for session ${sessionId}:`, newTitle);
         }

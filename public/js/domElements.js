@@ -28,3 +28,6 @@ export const sessionNameInput = document.getElementById('sessionNameInput');
 export const joinSessionBtn = document.getElementById('joinSessionBtn');
 export const copySessionLinkBtn = document.getElementById('copySessionLinkBtn');
 export const sessionTitleElement = document.getElementById('sessionTitle');
+export const activeSessionsDropdown = document.getElementById('activeSessionsDropdown');
+export const createNewSessionBtn = document.getElementById('createNewSessionBtn');
+

@@ -5,8 +5,12 @@ import {
     copySessionLinkBtn,
     sessionTitleElement,
     homeBtn,
-    currentSessionNameLabel
-} from './domElements.js';
+    currentSessionNameLabel,
+    activeSessionsDropdown,
+    createNewSessionBtn // Import the new button
+} from './domElements.js'; 
+
+const DEFAULT_SESSION_ID = 'default'; // Define client-side default session ID
 
 function navigateToSession() {
     if (!sessionNameInput) return;
@@ -18,34 +22,48 @@ function navigateToSession() {
     }
 }
 
-export function initializeSessionControls() {
+function generateRandomSessionName() {
+    // Simple random string generator (you might want something more robust for true uniqueness if scaling)
+    const randomPart = Math.random().toString(36).substring(2, 8);
+    const timestampPart = Date.now().toString(36).slice(-4);
+    return `${randomPart}${timestampPart}`;
+}
 
+function populateActiveSessionsDropdown(sessionsList) {
+    if (!activeSessionsDropdown) return;
+    const currentDropdownValue = activeSessionsDropdown.value; // Preserve current selection if possible
+    activeSessionsDropdown.innerHTML = ''; // Clear existing options
 
-    if (homeBtn) {
-        homeBtn.addEventListener('click', () => {
-            window.location.href = window.location.origin;
-        });
-    }
+    // Add a default "Select a session" option
+    const defaultOption = document.createElement('option');
+    defaultOption.value = "";
+    defaultOption.textContent = "Switch to session...";
+    defaultOption.disabled = true; // Make it non-selectable as a navigation target
+    activeSessionsDropdown.appendChild(defaultOption);
 
-    // Setup for session input and join button
-    if (sessionNameInput && joinSessionBtn) {
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionNameFromUrl = urlParams.get('session');
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentSessionIdFromUrl = urlParams.get('session') || DEFAULT_SESSION_ID;
 
-        if (sessionNameFromUrl) {
-            sessionNameInput.value = decodeURIComponent(sessionNameFromUrl);
+    sessionsList.forEach(session => {
+        const option = document.createElement('option');
+        option.value = session.id;
+        // Display the session title, fallback to a formatted ID if title is generic
+        option.textContent = (session.title && session.title !== `Session: ${session.id}` && session.title !== "T-Collab") 
+                             ? session.title 
+                             : (session.id === DEFAULT_SESSION_ID ? "T-Collab (Default)" : `Session: ${session.id}`);
+        if (session.id === currentSessionIdFromUrl) {
+            option.selected = true;
         }
-
-        joinSessionBtn.addEventListener('click', navigateToSession);
-        sessionNameInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                navigateToSession();
-            }
-        });
-    } else {
-        console.warn("Session input field ('sessionNameInput') or join button ('joinSessionBtn') not found. Session navigation UI may not work correctly.");
+        activeSessionsDropdown.appendChild(option);
+    });
+    // Restore selection or default if current session is not in the list (e.g. after deleting a session)
+    activeSessionsDropdown.value = currentDropdownValue && activeSessionsDropdown.querySelector(`option[value="${currentDropdownValue}"]`) ? currentDropdownValue : "";
+    if (!activeSessionsDropdown.value && currentSessionIdFromUrl) { // If no value selected, try to select current session
+        activeSessionsDropdown.value = currentSessionIdFromUrl;
     }
+}
+
+export function initializeSessionControls() {
 
     // Setup for copy session link button
     if (copySessionLinkBtn) {
@@ -120,6 +138,31 @@ export function initializeSessionControls() {
             if (currentSessionNameLabel) {
                 currentSessionNameLabel.textContent = newTitle;
             }
+        });
+
+        // Listen for the list of active sessions
+        socket.on('activeSessionsList', (sessionsList) => {
+            populateActiveSessionsDropdown(sessionsList);
+        });
+    }
+
+    // Setup for active sessions dropdown navigation
+    if (activeSessionsDropdown) {
+        activeSessionsDropdown.addEventListener('change', (event) => {
+            const selectedSessionId = event.target.value;
+            if (selectedSessionId && selectedSessionId !== (new URLSearchParams(window.location.search).get('session') || DEFAULT_SESSION_ID)) {
+                navigateToSession(selectedSessionId); // Use a modified navigateToSession or inline
+                window.location.href = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(selectedSessionId)}`;
+            }
+        });
+    }
+
+    // Setup for Create New Session button
+    if (createNewSessionBtn) {
+        createNewSessionBtn.addEventListener('click', () => {
+            const newSessionName = generateRandomSessionName();
+            // Navigate to the new session
+            window.location.href = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(newSessionName)}`;
         });
     }
 }
