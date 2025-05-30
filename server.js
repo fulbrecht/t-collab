@@ -350,20 +350,56 @@ io.on('connection', (socket) => {
                     newAccountsData[account.id] = account;
                 }
             });
-            if (importedData.sessionTitle) {
+            let titleUpdated = false;
+            if (typeof importedData.sessionTitle === 'string' && session.title !== importedData.sessionTitle) {
                 session.title = importedData.sessionTitle;
+                titleUpdated = true;
             }
             session.accountsData = newAccountsData;
             session.transactions = importedData.transactions;
 
             // Broadcast the new complete state to ALL clients IN THIS SESSION
-            io.to(sessionId).emit('initialSessionTitle', session.title); // Send updated title)
+            io.to(sessionId).emit('initialSessionTitle', session.title); // Send updated title
             io.to(sessionId).emit('initialAccounts', Object.values(session.accountsData)); // Send updated accounts
             io.to(sessionId).emit('initialTransactions', session.transactions); // Send updated transactions
             // Optionally, could also send userCountUpdate if that's part of the state, though it's managed live.
+            // If the title was updated, also send the new list of active sessions
+            if (titleUpdated) {
+                const updatedActiveSessions = Object.keys(sessions).map(sId => ({
+                    id: sId,
+                    title: sessions[sId].title
+                }));
+                io.emit('activeSessionsList', updatedActiveSessions);
+            }
             console.log(`Session ${sessionId} state updated from import. Broadcasted to all clients in session.`);
         } else {
             console.warn(`Received invalid data for stateImported event from client ${socket.id} for session ${sessionId}:`, importedData);
+        }
+    });
+
+    socket.on('deleteSession', (sessionIdToDelete) => {
+        if (!sessionIdToDelete || sessionIdToDelete === DEFAULT_SESSION_ID) {
+            console.warn(`Attempt to delete invalid or default session: ${sessionIdToDelete} by ${socket.id}`);
+            socket.emit('deleteSessionError', { message: 'Default session cannot be deleted or invalid session ID.' });
+            return;
+        }
+
+        if (sessions[sessionIdToDelete]) {
+            delete sessions[sessionIdToDelete];
+            console.log(`Session ${sessionIdToDelete} deleted by ${socket.id}.`);
+
+            // Broadcast the updated list of active sessions
+            const updatedActiveSessions = Object.keys(sessions).map(sId => ({
+                id: sId,
+                title: sessions[sId].title
+            }));
+            io.emit('activeSessionsList', updatedActiveSessions);
+
+            // Inform the requesting client and suggest redirecting to default
+            socket.emit('sessionDeleted', { deletedSessionId: sessionIdToDelete, newCurrentSessionId: DEFAULT_SESSION_ID });
+        } else {
+            console.warn(`Attempt to delete non-existent session: ${sessionIdToDelete} by ${socket.id}`);
+            socket.emit('deleteSessionError', { message: `Session ${sessionIdToDelete} not found.` });
         }
     });
 

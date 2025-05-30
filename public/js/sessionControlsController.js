@@ -1,26 +1,13 @@
 import { socket } from './socketService.js';
 import {
-    sessionNameInput,
-    joinSessionBtn,
     copySessionLinkBtn,
     sessionTitleElement,
-    homeBtn,
-    currentSessionNameLabel,
     activeSessionsDropdown,
+    deleteCurrentSessionBtn,
     createNewSessionBtn // Import the new button
 } from './domElements.js'; 
 
 const DEFAULT_SESSION_ID = 'default'; // Define client-side default session ID
-
-function navigateToSession() {
-    if (!sessionNameInput) return;
-    const sessionName = sessionNameInput.value.trim();
-    if (sessionName) {
-        window.location.href = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(sessionName)}`;
-    } else {
-        alert("Please enter a session name.");
-    }
-}
 
 function generateRandomSessionName() {
     // Simple random string generator (you might want something more robust for true uniqueness if scaling)
@@ -47,10 +34,16 @@ function populateActiveSessionsDropdown(sessionsList) {
     sessionsList.forEach(session => {
         const option = document.createElement('option');
         option.value = session.id;
-        // Display the session title, fallback to a formatted ID if title is generic
-        option.textContent = (session.title && session.title !== `Session: ${session.id}` && session.title !== "T-Collab") 
-                             ? session.title 
-                             : (session.id === DEFAULT_SESSION_ID ? "T-Collab (Default)" : `Session: ${session.id}`);
+        // Display the session title
+        if (session.id === DEFAULT_SESSION_ID) {
+            option.textContent = `${session.title} (Default)`;
+        } else {
+            // For non-default sessions, use a more descriptive name if available
+            // The server initializes non-default sessions with "Untitled: id"
+            option.textContent = (session.title && session.title !== `Untitled: ${session.id}` && session.title !== `Session: ${session.id}`)
+                                 ? session.title
+                                 : `Session: ${session.id}`;
+        }
         if (session.id === currentSessionIdFromUrl) {
             option.selected = true;
         }
@@ -121,9 +114,7 @@ export function initializeSessionControls() {
     if (socket) {
         // When the server sends the initial title (e.g., upon connection)
         socket.on('initialSessionTitle', (title) => { // Or whatever event your server sends
-            if (currentSessionNameLabel) {
-                currentSessionNameLabel.textContent = title;
-            }
+
             // Also update the main H2 title if it's still showing loading text
             if (sessionTitleElement && (sessionTitleElement.textContent.trim() === "Loading Session Title..." || !sessionTitleElement.textContent.trim())) {
                 sessionTitleElement.textContent = title;
@@ -134,9 +125,6 @@ export function initializeSessionControls() {
         socket.on('sessionTitleUpdated', (newTitle) => {
             if (sessionTitleElement && document.activeElement !== sessionTitleElement) {
                 sessionTitleElement.textContent = newTitle;
-            }
-            if (currentSessionNameLabel) {
-                currentSessionNameLabel.textContent = newTitle;
             }
         });
 
@@ -151,7 +139,6 @@ export function initializeSessionControls() {
         activeSessionsDropdown.addEventListener('change', (event) => {
             const selectedSessionId = event.target.value;
             if (selectedSessionId && selectedSessionId !== (new URLSearchParams(window.location.search).get('session') || DEFAULT_SESSION_ID)) {
-                navigateToSession(selectedSessionId); // Use a modified navigateToSession or inline
                 window.location.href = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(selectedSessionId)}`;
             }
         });
@@ -163,6 +150,34 @@ export function initializeSessionControls() {
             const newSessionName = generateRandomSessionName();
             // Navigate to the new session
             window.location.href = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(newSessionName)}`;
+        });
+         }
+
+    // Setup for Delete Current Session button
+    if (deleteCurrentSessionBtn) {
+        deleteCurrentSessionBtn.addEventListener('click', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentSessionId = urlParams.get('session') || DEFAULT_SESSION_ID;
+
+            if (currentSessionId === DEFAULT_SESSION_ID) {
+                alert("The default session cannot be deleted.");
+                return;
+            }
+
+            if (confirm(`Are you sure you want to delete the session "${sessionTitleElement.textContent || currentSessionId}"? This action cannot be undone.`)) {
+                if (socket) {
+                    socket.emit('deleteSession', currentSessionId);
+                } else {
+                    console.error("Socket not initialized when trying to emit deleteSession.");
+                }
+            }
+        });
+    }
+
+    if (socket) {
+        socket.on('sessionDeleted', ({ deletedSessionId, newCurrentSessionId }) => {
+            alert(`Session "${deletedSessionId}" has been deleted. You will be redirected to the default session.`);
+            window.location.href = `${window.location.origin}${window.location.pathname}?session=${encodeURIComponent(newCurrentSessionId)}`;
         });
     }
 }

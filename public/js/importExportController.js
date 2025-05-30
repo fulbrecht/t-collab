@@ -53,12 +53,14 @@ export function initializeImportExport() {
                             Array.isArray(importedData.transactions) &&
                             (typeof importedData.sessionTitle === 'string' || typeof importedData.sessionTitle === 'undefined')) {
                             socket.emit('stateImported', importedData); // Send the whole object
+                            console.log('Data imported and sent to server for synchronization.');
                             // Manually update the title on the importing client if present
                             if (dom.sessionTitleElement && typeof importedData.sessionTitle === 'string') {
-                            console.log('Data imported and sent to server for synchronization.');
+                                dom.sessionTitleElement.textContent = importedData.sessionTitle;
+                            }
                         } else {
                             alert('Invalid file format. Expected JSON with "accounts" and "transactions" arrays, and optionally a "sessionTitle" string.');
-                        }}
+                        }
                     } catch (error) {
                         alert('Error parsing JSON file: ' + error.message);
                     } finally {
