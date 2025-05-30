@@ -26,6 +26,38 @@ app.get('/', (req, res) => {
 // In-memory store for T-account data
 let connectedUsers = 0; // Global counter for all connected users
 
+/**
+ * Recalculates all account balances (debits, credits, totals) for a session
+ * based ONLY on transactions marked as isActive.
+ * @param {object} session - The session object.
+ */
+function recalculateAccountBalances(session) {
+    // Reset all account debit/credit arrays and totals
+    for (const accountId in session.accountsData) {
+        session.accountsData[accountId].debits = [];
+        session.accountsData[accountId].credits = [];
+        session.accountsData[accountId].totalDebits = 0;
+        session.accountsData[accountId].totalCredits = 0;
+    }
+
+    session.transactions.forEach(txn => {
+        if (txn.isActive) { // Only process active transactions
+            txn.entries.forEach(entry => {
+                const account = session.accountsData[entry.accountId];
+                if (!account) return; // Should not happen if data is consistent
+                const newServerEntry = { id: `s_entry-${Date.now()}-${Math.random()}`, transactionId: txn.id, amount: entry.amount, description: txn.description };
+                if (entry.type === 'debit') {
+                    account.debits.push(newServerEntry);
+                    account.totalDebits += entry.amount;
+                } else { // credit
+                    account.credits.push(newServerEntry);
+                    account.totalCredits += entry.amount;
+                }
+            });
+        }
+    });
+}
+
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
@@ -200,31 +232,23 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 2. Update server-side accountsData
-        transaction.entries.forEach(entry => { // Update uses the session's accountsData
-            const account = session.accountsData[entry.accountId];
-            const newServerEntry = { id: `s_entry-${Date.now()}-${Math.random()}`, transactionId: transaction.id, amount: entry.amount, description: transaction.description };
-            if (entry.type === 'debit') {
-                account.debits.push(newServerEntry);
-                account.totalDebits += entry.amount;
-            } else { // credit
-                account.credits.push(newServerEntry);
-                account.totalCredits += entry.amount;
-            }
-        });
-
         // 3. Store the transaction itself
-        session.transactions.push(transaction);
+        const newTransaction = { ...transaction, isActive: true }; // Add isActive flag
+        session.transactions.push(newTransaction);
 
-        // 4. Broadcast the processed transaction to all OTHER clients
-        // The client that initiated the transaction already processed it locally. Broadcast to others in the same session.
-        socket.broadcast.to(sessionId).emit('transactionAdded', transaction);
-        console.log(`Transaction ${transaction.id} processed for session ${sessionId} and broadcasted. Affected accounts: ${Array.from(accountsToUpdate).join(', ')}`);
+        // 4. Recalculate all account balances based on active transactions
+        recalculateAccountBalances(session);
+
+        // 5. Broadcast the new transaction and updated accounts to all clients in the session
+        io.to(sessionId).emit('transactionAdded', newTransaction); // Send the transaction with its active state
+        io.to(sessionId).emit('initialAccounts', Object.values(session.accountsData)); // Send updated accounts
+        console.log(`Transaction ${newTransaction.id} added to session ${sessionId}, balances recalculated. Affected accounts: ${Array.from(accountsToUpdate).join(', ')}`);
     });
 
     // Listen for a client deleting a transaction
     socket.on('deleteTransaction', (transactionId) => {
         console.log('Received deleteTransaction event for ID:', transactionId);
+        const initialAccountStateForComparison = JSON.parse(JSON.stringify(session.accountsData)); // Deep copy for logging
 
         const transactionIndex = session.transactions.findIndex(txn => txn.id === transactionId);
         if (transactionIndex === -1) {
@@ -232,27 +256,38 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const transactionToDelete = session.transactions[transactionIndex];
-
-        // Reverse the effects of the transaction on accountsData
-        transactionToDelete.entries.forEach(entry => {
-            const account = session.accountsData[entry.accountId]; // Use session's accountsData
-            if (account) {
-                if (entry.type === 'debit') {
-                    account.debits = account.debits.filter(dEntry => dEntry.transactionId !== transactionId);
-                    account.totalDebits -= entry.amount;
-                } else { // credit
-                    account.credits = account.credits.filter(cEntry => cEntry.transactionId !== transactionId);
-                    account.totalCredits -= entry.amount;
-                }
-            }
-        });
-
         session.transactions.splice(transactionIndex, 1); // Remove from session's transactions array
+
+        // Recalculate all account balances
+        recalculateAccountBalances(session);
+
         io.to(sessionId).emit('transactionDeleted', transactionId); // Broadcast to all clients IN THIS SESSION
-        console.log(`Transaction ${transactionId} deleted from session ${sessionId}. Notified all clients.`);
+        io.to(sessionId).emit('initialAccounts', Object.values(session.accountsData)); // Send updated accounts
+        console.log(`Transaction ${transactionId} deleted from session ${sessionId}, balances recalculated. Notified all clients.`);
     });
 
+    // Listen for a client toggling a transaction's active state
+    socket.on('toggleTransactionActivity', (data) => { // Expected: { transactionId: string, isActive: boolean }
+        if (!data || typeof data.transactionId !== 'string' || typeof data.isActive !== 'boolean') {
+            console.warn('Invalid toggleTransactionActivity data:', data);
+            return;
+        }
+        const { transactionId, isActive } = data;
+        const transaction = session.transactions.find(txn => txn.id === transactionId);
+
+        if (transaction) {
+            transaction.isActive = isActive;
+            console.log(`Transaction ${transactionId} in session ${sessionId} isActive set to ${isActive}`);
+
+            recalculateAccountBalances(session);
+
+            io.to(sessionId).emit('transactionActivityUpdated', { transactionId, isActive });
+            io.to(sessionId).emit('initialAccounts', Object.values(session.accountsData));
+            console.log(`Balances recalculated for session ${sessionId} after toggling transaction ${transactionId}.`);
+        } else {
+            console.warn(`Transaction ${transactionId} not found for toggling activity in session ${sessionId}.`);
+        }
+    });
     // Listen for a client editing a transaction's description
     socket.on('editTransactionDescription', (data) => { // Expected data: { transactionId, newDescription }
         console.log('Received editTransactionDescription event:', data);

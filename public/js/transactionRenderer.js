@@ -6,11 +6,30 @@ import { socket } from './socketService.js';
 
 export function renderTransactionList() {
     dom.transactionListUl.innerHTML = '';
-    state.getTransactions().forEach(txn => {
+    const transactions = state.getTransactions(); // Get all transactions from local state
+
+    transactions.forEach(txn => {
         const listItem = document.createElement('li');
         listItem.className = 'transaction-list-item';
-        listItem.textContent = txn.description || `Transaction ${txn.id}`;
         listItem.setAttribute('data-transaction-id', txn.id);
+
+        // Active toggle switch (checkbox)
+        const activeToggle = document.createElement('input');
+        activeToggle.type = 'checkbox';
+        activeToggle.className = 'transaction-active-toggle';
+        activeToggle.checked = txn.isActive === undefined ? true : txn.isActive; // Default to true if isActive is not set
+        activeToggle.title = activeToggle.checked ? "Deactivate transaction (temporarily remove from T-accounts)" : "Activate transaction (add back to T-accounts)";
+        activeToggle.addEventListener('change', () => {
+            const isActive = activeToggle.checked;
+            socket.emit('toggleTransactionActivity', { transactionId: txn.id, isActive });
+            activeToggle.title = isActive ? "Deactivate transaction" : "Activate transaction";
+        });
+        listItem.appendChild(activeToggle);
+
+        const descriptionSpan = document.createElement('span');
+        descriptionSpan.className = 'transaction-description';
+        descriptionSpan.textContent = txn.description || `Transaction ${txn.id}`;
+        listItem.appendChild(descriptionSpan);
 
         listItem.addEventListener('mouseover', () => {
             socket.emit('startHighlightTransaction', { transactionId: txn.id });
@@ -22,7 +41,10 @@ export function renderTransactionList() {
         });
         listItem.addEventListener('dblclick', function(event) {
             event.stopPropagation();
-            handleEditTransactionDescriptionInPlace(txn, this);
+            // Ensure dblclick only triggers on description, not checkbox
+            if (event.target.closest('.transaction-description')) {
+                handleEditTransactionDescriptionInPlace(txn, descriptionSpan);
+            }
         });
 
         const deleteBtn = document.createElement('button');
@@ -30,6 +52,10 @@ export function renderTransactionList() {
         deleteBtn.className = 'transaction-delete-btn';
         deleteBtn.onclick = (event) => { event.stopPropagation(); handleDeleteTransaction(txn.id, txn.description); };
         listItem.appendChild(deleteBtn);
+
+        // Apply visual style if inactive
+        listItem.classList.toggle('inactive-transaction', !activeToggle.checked);
+
         dom.transactionListUl.appendChild(listItem);
     });
 }

@@ -76,18 +76,35 @@ export function initializeSocketHandlers() {
     });
 
     socket.on('transactionAdded', (transaction) => {
-        processTransaction(transaction, false);
+        // state.addTransaction will handle the isActive property.
+        // processTransaction might need to be aware of isActive or be simplified if
+        // server now sends fully updated accounts via 'initialAccounts' after this.
+        // For now, let's assume state.addTransaction and re-rendering is the primary path.
+        state.addTransaction(transaction);
+        renderTransactionList();
+        // If T-account balances are not updated by a subsequent 'initialAccounts' from server,
+        // you might need to call processTransaction(transaction, false); here as well.
+        // However, the server logic now recalculates and sends 'initialAccounts' after 'addTransaction'.
     });
 
     socket.on('transactionDeleted', (transactionId) => {
-        reverseTransactionEffects(transactionId);
+        // reverseTransactionEffects might need adjustment if server sends full 'initialAccounts'
         state.removeTransactionById(transactionId);
-        renderTransactionList(); renderTAccounts();
+        renderTransactionList();
+        // renderTAccounts(); // This will be handled by 'initialAccounts' from server
     });
 
     socket.on('transactionDescriptionUpdated', (data) => {
         const transaction = state.findTransactionById(data.transactionId);
         if (transaction) { transaction.description = data.newDescription; renderTransactionList(); }
+    });
+
+    socket.on('transactionActivityUpdated', ({ transactionId, isActive }) => {
+        console.log(`Received transactionActivityUpdated: ${transactionId}, isActive: ${isActive}`);
+        state.updateTransactionActiveState(transactionId, isActive);
+        renderTransactionList(); // Re-render the list to show the toggle state and style
+        // T-accounts will be updated by the 'initialAccounts' event that server sends
+        // after recalculating balances due to the activity toggle.
     });
 
     socket.on('highlightTransaction', (data) => highlightTransactionEntries(data.transactionId, data.shouldHighlight, 'remote'));
@@ -97,5 +114,3 @@ export function initializeSocketHandlers() {
 
 
 }
-
-

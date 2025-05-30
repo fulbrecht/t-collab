@@ -102,7 +102,11 @@ export function renderTAccounts() {
             group.select(".debit-total").text(`${netTotal.toFixed(2)}`);
         } else if(netTotal < 0){
             group.select(".credit-total").text(`${(-netTotal).toFixed(2)}`);
-        } 
+        } else {
+            group.select(".debit-total").text("");
+            group.select(".credit-total").text("");
+        
+        }
         
 
         const debitEntries = group.selectAll(".debit-entry-text").data(d.debits, entry => entry.id);
