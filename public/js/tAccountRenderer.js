@@ -83,6 +83,11 @@ export function buildTAccountStructure(selection) {
 export function renderTAccounts() {
     const groups = svg.selectAll(".draggable-group")
         .data(state.getAccounts(), d => d.id);
+    
+    // Get all transactions once to efficiently find indices later
+    const allTransactions = state.getTransactions();
+    const entryRowHeight = 15; // Height of each entry row
+    const entryStartY = columnLabelYOffset + 20; // Starting Y position for the first entry
 
     groups.exit().remove();
 
@@ -100,22 +105,62 @@ export function renderTAccounts() {
         const netTotal = d.totalDebits - d.totalCredits;
         if(netTotal > 0){
             group.select(".debit-total").text(`${netTotal.toFixed(2)}`);
+            group.select(".credit-total").text("");
         } else if(netTotal < 0){
             group.select(".credit-total").text(`${(-netTotal).toFixed(2)}`);
-        } else {
             group.select(".debit-total").text("");
-            group.select(".credit-total").text("");
+        } else {
+            group.select(".debit-total").text("0.00");
+            group.select(".credit-total").text("0.00");
         
         }
+        // group.select(".debit-total").text(d.totalDebits.toFixed(2));
+        // group.select(".credit-total").text(d.totalCredits.toFixed(2));
         
 
-        const debitEntries = group.selectAll(".debit-entry-text").data(d.debits, entry => entry.id);
-        debitEntries.exit().remove();
-        debitEntries.enter().append("text")
+        // --- DEBIT ENTRIES ---
+        const debitEntryGroups = group.selectAll(".debit-entry-group")
+            .data(d.debits, entry => entry.id);
+
+        debitEntryGroups.exit().remove();
+
+        const debitEntryGroupsEnter = debitEntryGroups.enter().append("g")
+            .attr("class", "debit-entry-group")
+            .attr("transform", (entry) => {
+                const sourceTransaction = allTransactions.find(t => t.id === entry.transactionId);
+                const transactionListIndex = sourceTransaction ? allTransactions.indexOf(sourceTransaction) : -1;
+                return `translate(0, ${entryStartY + (transactionListIndex * entryRowHeight)})`;
+            });
+
+        // Debit Entry Index
+        debitEntryGroupsEnter.append("text")
+            .attr("class", "t-account-entry-index debit-entry-index") // Keep specific class if needed for styling/selection, common class for shared styles
+            .attr("x", 10) // X position for debit index
+            .attr("text-anchor", "start");
+
+        // Debit Entry Amount
+        debitEntryGroupsEnter.append("text")
             .attr("class", "debit-entry-text")
             .attr("x", tAccountWidth / 4)
-            .merge(debitEntries)
-            .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15))
+            .attr("text-anchor", "middle");
+
+        const allDebitEntryGroups = debitEntryGroups.merge(debitEntryGroupsEnter);
+
+        // Update transform for existing groups as well if their underlying transaction's index changes (though less likely)
+        allDebitEntryGroups.attr("transform", (entry) => {
+            const sourceTransaction = allTransactions.find(t => t.id === entry.transactionId);
+            const transactionListIndex = sourceTransaction ? allTransactions.indexOf(sourceTransaction) : -1;
+            return `translate(0, ${entryStartY + (transactionListIndex * entryRowHeight)})`;
+        });
+        allDebitEntryGroups.select(".debit-entry-index")
+            .text(entry => {
+                const sourceTransaction = allTransactions.find(t => t.id === entry.transactionId);
+                const transactionIndex = sourceTransaction ? allTransactions.indexOf(sourceTransaction) : -1;
+                return transactionIndex !== -1 ? `${transactionIndex + 1}.` : "";
+            })
+            .attr("data-transaction-id", entry => entry.transactionId);
+
+        allDebitEntryGroups.select(".debit-entry-text")
             .text(entry => entry.amount.toFixed(2))
             .attr("data-transaction-id", entry => entry.transactionId)
             .style("pointer-events", "auto") // Apply to merged selection
@@ -129,13 +174,49 @@ export function renderTAccounts() {
                 highlightTransactionEntries(entry.transactionId, false, 'local');
             });
             
-        const creditEntries = group.selectAll(".credit-entry-text").data(d.credits, entry => entry.id);
-        creditEntries.exit().remove();
-        creditEntries.enter().append("text")
+        // --- CREDIT ENTRIES ---
+        const creditEntryGroups = group.selectAll(".credit-entry-group")
+            .data(d.credits, entry => entry.id);
+
+        creditEntryGroups.exit().remove();
+
+        const creditEntryGroupsEnter = creditEntryGroups.enter().append("g")
+            .attr("class", "credit-entry-group")
+            .attr("transform", (entry) => {
+                const sourceTransaction = allTransactions.find(t => t.id === entry.transactionId);
+                const transactionListIndex = sourceTransaction ? allTransactions.indexOf(sourceTransaction) : -1;
+                return `translate(0, ${entryStartY + (transactionListIndex * entryRowHeight)})`;
+            });
+
+        // Credit Entry Index
+        creditEntryGroupsEnter.append("text")
+            .attr("class", "t-account-entry-index credit-entry-index") // Keep specific class, common class for shared styles
+            .attr("x", 10) // X position for credit index, now aligned to far left
+            .attr("text-anchor", "start");
+        
+        // Credit Entry Amount
+        creditEntryGroupsEnter.append("text")
             .attr("class", "credit-entry-text")
             .attr("x", (tAccountWidth / 4) * 3)
-            .merge(creditEntries)
-            .attr("y", (entry, i) => columnLabelYOffset + 20 + (i * 15))
+            .attr("text-anchor", "middle");
+
+        const allCreditEntryGroups = creditEntryGroups.merge(creditEntryGroupsEnter);
+
+        // Update transform for existing groups
+        allCreditEntryGroups.attr("transform", (entry) => {
+            const sourceTransaction = allTransactions.find(t => t.id === entry.transactionId);
+            const transactionListIndex = sourceTransaction ? allTransactions.indexOf(sourceTransaction) : -1;
+            return `translate(0, ${entryStartY + (transactionListIndex * entryRowHeight)})`;
+        });
+        allCreditEntryGroups.select(".credit-entry-index")
+            .text(entry => {
+                const sourceTransaction = allTransactions.find(t => t.id === entry.transactionId);
+                const transactionIndex = sourceTransaction ? allTransactions.indexOf(sourceTransaction) : -1;
+                return transactionIndex !== -1 ? `${transactionIndex + 1}.` : "";
+            })
+            .attr("data-transaction-id", entry => entry.transactionId);
+
+        allCreditEntryGroups.select(".credit-entry-text")
             .text(entry => entry.amount.toFixed(2))
             .attr("data-transaction-id", entry => entry.transactionId)
             .style("pointer-events", "auto") // Apply to merged selection

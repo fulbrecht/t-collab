@@ -88,6 +88,18 @@ h2#sessionTitle:focus {
     font-size: 13px;
     fill: #34495E;
 }
+.t-account-entry-index {
+    font-size: 11px; /* Slightly smaller than amount */
+    fill: #555; /* A slightly muted color */
+    /* dominant-baseline and text-anchor are set in JS */
+}
+
+.debit-entry-text, .credit-entry-text {
+    font-size: 12px;
+    fill: #333;
+    /* dominant-baseline and text-anchor are set in JS */
+}
+
 svg {
     border: 1px solid #ccc;
     display: block; /* Ensure it behaves as a block-level element */
@@ -171,6 +183,13 @@ svg {
 }
 .transaction-list-item:hover {
     background-color: #e9e9e9;
+}
+
+.transaction-number {
+    margin-right: 8px;
+    font-weight: bold;
+    color: #555;
+    flex-shrink: 0; /* Prevent number from shrinking */
 }
 
 .transaction-active-toggle {

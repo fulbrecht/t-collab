@@ -2,6 +2,11 @@ import * as dom from './domElements.js';
 import * as state from './state.js';
 import { socket } from './socketService.js';
 
+function sanitizeFilename(name) {
+    // Replace spaces with underscores and remove characters not allowed in filenames
+    return name.replace(/\s+/g, '_').replace(/[^\w.-]/g, '');
+}
+
 export function initializeImportExport() {
     if (dom.exportBtnEl) {
         dom.exportBtnEl.addEventListener('click', () => {
@@ -15,7 +20,8 @@ export function initializeImportExport() {
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 't-collab-data.json';
+            const filename = sanitizeFilename(currentSessionTitle || 't-collab-session') + '.json';
+            a.href = url; a.download = filename;
             document.body.appendChild(a); a.click();
             document.body.removeChild(a); URL.revokeObjectURL(url);
             console.log('Data exported with session title.');

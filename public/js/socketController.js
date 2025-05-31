@@ -28,6 +28,8 @@ export function initializeSocketHandlers() {
         console.log('Received initial transactions:', serverTransactions);
         state.setTransactions(serverTransactions);
         renderTransactionList();
+        // Re-render T-Accounts now that transactions are loaded, ensuring correct entry positioning
+        renderTAccounts();
     });
 
     socket.on('newAccountAdded', (accountData) => {

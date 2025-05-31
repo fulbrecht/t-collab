@@ -8,10 +8,16 @@ export function renderTransactionList() {
     dom.transactionListUl.innerHTML = '';
     const transactions = state.getTransactions(); // Get all transactions from local state
 
-    transactions.forEach(txn => {
+    transactions.forEach((txn, index) => {
         const listItem = document.createElement('li');
         listItem.className = 'transaction-list-item';
         listItem.setAttribute('data-transaction-id', txn.id);
+
+        // Transaction Number
+        const numberSpan = document.createElement('span');
+        numberSpan.className = 'transaction-number';
+        numberSpan.textContent = `${index + 1}.`;
+        listItem.appendChild(numberSpan);
 
         // Active toggle switch (checkbox)
         const activeToggle = document.createElement('input');
