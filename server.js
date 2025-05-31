@@ -377,6 +377,35 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('reorderTransactions', (orderedTransactionIds) => {
+        if (!Array.isArray(orderedTransactionIds)) {
+            console.warn(`Invalid data received for reorderTransactions from ${socket.id}`);
+            return;
+        }
+        if (!session || !session.transactions) return;
+
+        const newTransactionOrder = [];
+        orderedTransactionIds.forEach(id => {
+            const transaction = session.transactions.find(txn => txn.id === id);
+            if (transaction) {
+                newTransactionOrder.push(transaction);
+            }
+        });
+
+        // Ensure all original transactions are present, just reordered
+        if (newTransactionOrder.length === session.transactions.length) {
+            session.transactions = newTransactionOrder;
+            console.log(`Transactions reordered for session ${sessionId} by ${socket.id}`);
+            recalculateAccountBalances(session); // Recalculate as entry y-positions depend on this order
+            io.to(sessionId).emit('initialTransactions', session.transactions); // Send reordered transactions
+            io.to(sessionId).emit('initialAccounts', Object.values(session.accountsData)); // Send updated accounts
+        } else {
+            console.warn(`Transaction reorder mismatch for session ${sessionId}. Client sent ${orderedTransactionIds.length}, server had ${session.transactions.length}.`);
+            // Optionally send back the current server order to resync client
+            socket.emit('initialTransactions', session.transactions);
+        }
+    });
+
     socket.on('deleteSession', (sessionIdToDelete) => {
         if (!sessionIdToDelete || sessionIdToDelete === DEFAULT_SESSION_ID) {
             console.warn(`Attempt to delete invalid or default session: ${sessionIdToDelete} by ${socket.id}`);

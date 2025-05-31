@@ -28,7 +28,8 @@ export function initializeSocketHandlers() {
         console.log('Received initial transactions:', serverTransactions);
         state.setTransactions(serverTransactions);
         renderTransactionList();
-        // Re-render T-Accounts now that transactions are loaded, ensuring correct entry positioning
+        // Re-render T-Accounts now that transactions are loaded or reordered,
+        // ensuring correct entry positioning based on transaction list index.
         renderTAccounts();
     });
 

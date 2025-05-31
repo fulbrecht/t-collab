@@ -1,8 +1,57 @@
 import { svg } from './svgService.js';
 import * as state from './state.js';
 import * as dom from './domElements.js';
-import { handleDeleteTransaction, handleEditTransactionDescriptionInPlace } from './transactionActions.js'; // Forward declaration
+import { handleDeleteTransaction, handleEditTransactionDescriptionInPlace } from './transactionActions.js';
 import { socket } from './socketService.js';
+import { renderTAccounts } from './tAccountRenderer.js';
+
+let draggedTransactionId = null;
+
+function handleDragStart(event) {
+    draggedTransactionId = event.target.getAttribute('data-transaction-id');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', draggedTransactionId); // Necessary for Firefox
+    event.target.classList.add('dragging-transaction');
+}
+
+function handleDragOver(event) {
+    event.preventDefault(); // Allow drop
+    event.dataTransfer.dropEffect = 'move';
+    const targetLi = event.target.closest('.transaction-list-item');
+    if (targetLi && targetLi.getAttribute('data-transaction-id') !== draggedTransactionId) {
+        // Optional: Add visual cue for drop target
+        // targetLi.classList.add('drag-over-target');
+    }
+}
+
+function handleDrop(event) {
+    event.preventDefault();
+    const targetLi = event.target.closest('.transaction-list-item');
+    if (!targetLi || !draggedTransactionId) return;
+
+    const targetTransactionId = targetLi.getAttribute('data-transaction-id');
+    if (targetTransactionId === draggedTransactionId) return;
+
+    let transactions = [...state.getTransactions()];
+    const draggedItemIndex = transactions.findIndex(txn => txn.id === draggedTransactionId);
+    const targetItemIndex = transactions.findIndex(txn => txn.id === targetTransactionId);
+
+    if (draggedItemIndex === -1 || targetItemIndex === -1) return;
+
+    const [draggedItem] = transactions.splice(draggedItemIndex, 1);
+    transactions.splice(targetItemIndex, 0, draggedItem);
+
+    state.setTransactions(transactions); // Update local state immediately
+    socket.emit('reorderTransactions', transactions.map(txn => txn.id)); // Send new order of IDs to server
+    renderTransactionList(); // Re-render with new order and numbering
+    renderTAccounts(); // Re-render T-accounts as transaction indices change y-positions
+}
+
+function handleDragEnd(event) {
+    event.target.classList.remove('dragging-transaction');
+    draggedTransactionId = null;
+    // Optional: Remove any 'drag-over-target' classes
+}
 
 export function renderTransactionList() {
     dom.transactionListUl.innerHTML = '';
@@ -12,6 +61,16 @@ export function renderTransactionList() {
         const listItem = document.createElement('li');
         listItem.className = 'transaction-list-item';
         listItem.setAttribute('data-transaction-id', txn.id);
+        listItem.draggable = true;
+        listItem.addEventListener('dragstart', handleDragStart);
+        listItem.addEventListener('dragover', handleDragOver);
+        listItem.addEventListener('drop', handleDrop);
+        listItem.addEventListener('dragend', handleDragEnd);
+
+        const dragHandle = document.createElement('span');
+        dragHandle.className = 'drag-handle';
+        dragHandle.innerHTML = '&#x2630;'; // Hamburger icon or similar
+        listItem.appendChild(dragHandle);
 
         // Transaction Number
         const numberSpan = document.createElement('span');
