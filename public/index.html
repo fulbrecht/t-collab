@@ -42,21 +42,24 @@
         <div class="modal-content">
             <span class="close-button" id="closeTransactionModal">&times;</span>
             <h2>New Transaction</h2>
-            <label for="transactionDescription">Description:</label>
-            <input type="text" id="transactionDescription" name="transactionDescription">
+            <form id="transactionForm"> <!-- Add form tag here -->
+                <label for="transactionDescription">Description:</label>
+                <input type="text" id="transactionDescription" name="transactionDescription">
 
-            <div id="transactionEntriesContainer">
-                <!-- Transaction entry rows will be added here -->
-            </div>
+                <div id="transactionEntriesContainer">
+                    <!-- Transaction entry rows will be added here -->
+                </div>
 
-            <button id="addTransactionEntryRow" style="margin-top:15px; margin-bottom:15px;">Add Entry</button>
-            
-            <div>
-                <strong>Total Debits: <span id="modalTotalDebits">0.00</span></strong><br>
-                <strong>Total Credits: <span id="modalTotalCredits">0.00</span></strong>
-            </div>
+                <button type="button" id="addTransactionEntryRow" style="margin-top:15px; margin-bottom:15px;">Add Entry</button>
+                
+                <div>
+                    <strong>Total Debits: <span id="modalTotalDebits">0.00</span></strong><br>
+                    <strong>Total Credits: <span id="modalTotalCredits">0.00</span></strong>
+                </div>
 
-            <button id="saveTransactionBtn" style="margin-top:20px;">Save Transaction</button>
+                <!-- The "allow unbalanced" checkbox will be inserted here by JS -->
+                <button type="button" id="saveTransactionBtn" style="margin-top:20px;">Save Transaction</button>
+            </form> <!-- Close form tag -->
         </div>
     </div>
     <!-- End Transaction Modal -->

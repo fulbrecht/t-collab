@@ -15,6 +15,14 @@ const io = socketIo(server);
 const DEFAULT_SESSION_ID = 'default'; // A default session if none is provided
 const PORT = process.env.PORT || 3000;
 
+// Initialize the default session at startup
+sessions[DEFAULT_SESSION_ID] = {
+    accountsData: {},
+    title: "T-Collab", // Default title for the default session
+    transactions: [],
+    connectedUsers: 0,
+};
+
 // Serve static files (HTML, CSS, client-side JS) from the current directory
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -214,7 +222,10 @@ io.on('connection', (socket) => {
 
     socket.on('addTransaction', (transaction) => {
         console.log('Received addTransaction:', transaction);
-        if (!transaction || !transaction.id || !Array.isArray(transaction.entries) || transaction.entries.length < 2) {
+        // Allow single-entry transactions if isUnbalancedAllowed is true
+        const minEntries = transaction.isUnbalancedAllowed === true ? 1 : 2;
+
+        if (!transaction || !transaction.id || !Array.isArray(transaction.entries) || transaction.entries.length < minEntries) {
             console.warn('Invalid transaction data received:', transaction);
             // Optionally, send an error back to the client
             // socket.emit('transactionError', { message: 'Invalid transaction data.' });
@@ -244,14 +255,16 @@ io.on('connection', (socket) => {
             accountsToUpdate.add(entry.accountId);
         }
 
-        if (totalDebits !== totalCredits || totalDebits === 0) {
+        // Check for balance only if isUnbalancedAllowed is explicitly false or undefined (for backward compatibility)
+        // If transaction.isUnbalancedAllowed is true, skip this balance check.
+        if (!(transaction.isUnbalancedAllowed === true) && (totalDebits !== totalCredits || totalDebits === 0)) {
             console.warn(`Transaction imbalance or zero total: Debits ${totalDebits}, Credits ${totalCredits}`);
             // socket.emit('transactionError', { message: 'Transaction debits must equal credits and not be zero.' });
             return;
         }
 
         // 3. Store the transaction itself
-        const newTransaction = { ...transaction, isActive: true }; // Add isActive flag
+        const newTransaction = { ...transaction, isActive: transaction.isActive === undefined ? true : transaction.isActive }; // Preserve isActive, default to true
         session.transactions.push(newTransaction);
 
         // 4. Recalculate all account balances based on active transactions

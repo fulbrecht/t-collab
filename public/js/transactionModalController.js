@@ -65,12 +65,40 @@ export function initializeTransactionModal() {
         dom.transactionEntriesContainer.innerHTML = '';
         addEntryRowToModal({ amount: 100 });
         addEntryRowToModal({ type: 'credit', amount: 100 });
+        // Ensure the "allow unbalanced" checkbox is unchecked by default
+        const allowUnbalancedCheckbox = document.getElementById('allowUnbalancedTxn');
+        if (allowUnbalancedCheckbox) allowUnbalancedCheckbox.checked = false;
+
         updateModalTotals();
     };
     dom.closeTransactionModalBtn.onclick = () => dom.transactionModal.style.display = "none";
     window.onclick = (event) => { if (event.target === dom.transactionModal) dom.transactionModal.style.display = "none"; };
     dom.addTransactionEntryRowBtn.onclick = () => addEntryRowToModal(); // Call without args for default behavior
 
+    // Add checkbox for allowing unbalanced transactions
+    const unbalancedContainer = document.createElement('div');
+    unbalancedContainer.style.display = 'flex'; // Align items horizontally
+    unbalancedContainer.style.alignItems = 'center'; // Vertically center items in the flex container
+    unbalancedContainer.style.marginTop = '10px'; // Add some space above
+
+    const allowUnbalancedCheckbox = document.createElement('input');
+    allowUnbalancedCheckbox.type = 'checkbox';
+    allowUnbalancedCheckbox.id = 'allowUnbalancedTxn';
+    allowUnbalancedCheckbox.style.marginRight = '5px'; // Space between checkbox and label
+
+    const unbalancedLabel = document.createElement('label');
+    unbalancedLabel.htmlFor = 'allowUnbalancedTxn';
+    unbalancedLabel.textContent = ' Allow unbalanced transaction (e.g., for opening balances)';
+
+    unbalancedContainer.appendChild(allowUnbalancedCheckbox);
+    unbalancedContainer.appendChild(unbalancedLabel);
+
+    if (dom.transactionForm && dom.saveTransactionBtn) {
+        dom.transactionForm.insertBefore(unbalancedContainer, dom.saveTransactionBtn);
+    } else {
+        console.error("Transaction form or save button not found in DOM. Cannot add 'allow unbalanced' checkbox.");
+    }
+    
     dom.saveTransactionBtn.onclick = () => {
         const description = dom.transactionDescriptionInput.value.trim();
         const entries = [];
@@ -83,10 +111,12 @@ export function initializeTransactionModal() {
             entries.push({ accountId, type, amount });
             if (type === 'debit') totalDebits += amount; else totalCredits += amount;
         });
-        if (entries.length < 2 || totalDebits !== totalCredits || totalDebits === 0) {
-            alert("Invalid transaction. Ensure at least two entries, debits equal credits, and total is not zero."); return;
+
+        const isUnbalancedAllowed = document.getElementById('allowUnbalancedTxn').checked;
+        if (!isUnbalancedAllowed && (entries.length < 2 || totalDebits !== totalCredits || totalDebits === 0)) {
+            alert("Invalid transaction. Ensure at least two entries, debits equal credits, and total is not zero. Or, check 'Allow unbalanced transaction'."); return;
         }
-        const transaction = { id: `txn-${Date.now()}`, description, entries };
+        const transaction = { id: `txn-${Date.now()}`, description, entries, isUnbalancedAllowed }; // Add isUnbalancedAllowed flag
         processTransaction(transaction);
         socket.emit('addTransaction', transaction);
         dom.transactionModal.style.display = "none";
