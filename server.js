@@ -236,6 +236,30 @@ io.on('connection', (socket) => {
         let totalCredits = 0;
         let accountsToUpdate = new Set(); // To track which accounts are affected
 
+        // New validation for duplicate account IDs in debit/credit entries
+        const debitEntries = transaction.entries.filter(entry => entry.type === 'debit');
+        const creditEntries = transaction.entries.filter(entry => entry.type === 'credit');
+
+        const debitAccountIds = new Set();
+        for (const entry of debitEntries) {
+            if (debitAccountIds.has(entry.accountId)) {
+                console.warn('Duplicate debit account ID:', entry.accountId);
+                // socket.emit('transactionError', { message: `Duplicate debit account ID: ${entry.accountId}.` });
+                return;
+            }
+            debitAccountIds.add(entry.accountId);
+        }
+
+        const creditAccountIds = new Set();
+        for (const entry of creditEntries) {
+            if (creditAccountIds.has(entry.accountId)) {
+                console.warn('Duplicate credit account ID:', entry.accountId);
+                // socket.emit('transactionError', { message: `Duplicate credit account ID: ${entry.accountId}.` });
+                return;
+            }
+            creditAccountIds.add(entry.accountId);
+        }
+
         // 1. Validate transaction entries and calculate totals
         for (const entry of transaction.entries) { // Validation should use the session's accountsData
             if (!entry.accountId || !session.accountsData[entry.accountId] || !entry.type || typeof entry.amount !== 'number' || entry.amount <= 0) {

@@ -112,6 +112,28 @@ export function initializeTransactionModal() {
             if (type === 'debit') totalDebits += amount; else totalCredits += amount;
         });
 
+        // Client-side validation for unique accounts in debits and credits
+        const debitEntries = entries.filter(entry => entry.type === 'debit');
+        const creditEntries = entries.filter(entry => entry.type === 'credit');
+
+        const debitAccountIds = new Set();
+        for (const entry of debitEntries) {
+            if (debitAccountIds.has(entry.accountId)) {
+                alert("Duplicate account found in debits. Each account can only be debited once per transaction.");
+                return;
+            }
+            debitAccountIds.add(entry.accountId);
+        }
+
+        const creditAccountIds = new Set();
+        for (const entry of creditEntries) {
+            if (creditAccountIds.has(entry.accountId)) {
+                alert("Duplicate account found in credits. Each account can only be credited once per transaction.");
+                return;
+            }
+            creditAccountIds.add(entry.accountId);
+        }
+
         const isUnbalancedAllowed = document.getElementById('allowUnbalancedTxn').checked;
         if (!isUnbalancedAllowed && (entries.length < 2 || totalDebits !== totalCredits || totalDebits === 0)) {
             alert("Invalid transaction. Ensure at least two entries, debits equal credits, and total is not zero. Or, check 'Allow unbalanced transaction'."); return;
