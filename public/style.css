@@ -1,0 +1,264 @@
+body {
+    margin: 0;
+    padding-top: 60px; /* Space for the fixed header */
+    flex-direction: column; /* Stack children vertically */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    font-family: sans-serif;
+}
+header.main-header { /* Give your header a class, e.g., class="main-header" */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #f0f0f0;
+    padding: 10px 20px; /* Added more horizontal padding for better spacing */
+    border-bottom: 1px solid #ccc;
+    z-index: 1000;
+    box-sizing: border-box;
+    display: flex; /* Use flexbox for layout */
+    justify-content: space-between; /* Pushes child divs to opposite ends */
+    align-items: center; /* Vertically aligns items in the center */
+}
+.main-controls { /* Give your main button container a class */
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* Session Title Styles */
+h2#sessionTitle {
+    font-size: 2em; /* Prominent title size */
+    font-weight: 600;
+    color: #2c3e50; /* Dark, readable color, consistent with other text */
+    margin-top: 15px; /* Space below the fixed header area */
+    margin-bottom: 20px; /* Space above the main controls */
+    padding: 8px 15px; /* Some padding around the text */
+    border: 1px dashed transparent; /* Invisible border, shows on focus/hover for editability cue */
+    border-radius: 6px;
+    min-width: 200px; /* Ensures it has some width even if empty, helps with centering */
+    max-width: 80%; /* Prevents it from becoming too wide on large screens */
+    text-align: center; /* Ensures text within the element is centered */
+    cursor: text; /* Indicates it's editable */
+    outline: none; /* Removes default browser outline on focus, as we use border */
+}
+
+h2#sessionTitle:hover,
+h2#sessionTitle:focus {
+    border: 1px dashed #7f8c8d; /* Visible border when hovered or editing */
+    background-color: #ffffff; /* Slightly different background when active */
+}
+.draggable-group {
+    cursor: grab;
+}
+.draggable-group.dragging {
+    cursor: grabbing;
+}
+.t-account-box {
+    fill: #ECF0F1; /* Light grey background */
+    stroke: #95A5A6; /* Medium grey stroke */
+    stroke-width: 1.5px;
+}
+.t-account-line {
+    stroke: #7F8C8D; /* Darker grey for lines */
+    stroke-width: 1px;
+}
+/* General text styling within a draggable T-account */
+.draggable-group text {
+    text-anchor: middle; /* Center the text horizontally */
+    dominant-baseline: middle; /* Center the text vertically */
+    pointer-events: none; /* Make text non-interactive for dragging */
+    font-family: sans-serif;
+    user-select: none; /* Prevent text selection during drag/click */
+}
+.t-account-title-text {
+    font-size: 16px;
+    font-weight: bold;
+    fill: #2C3E50; /* Dark blue-grey */
+}
+.t-account-column-label {
+    font-size: 12px;
+    fill: #34495E; /* Slightly lighter blue-grey */
+}
+.t-account-total-text { /* This class was missing from your original <style> block for the totals, but used in JS */
+    font-size: 13px;
+    fill: #34495E;
+}
+.t-account-entry-index {
+    font-size: 11px; /* Slightly smaller than amount */
+    fill: #555; /* A slightly muted color */
+    /* dominant-baseline and text-anchor are set in JS */
+}
+
+.debit-entry-text, .credit-entry-text {
+    font-size: 12px;
+    fill: #333;
+    /* dominant-baseline and text-anchor are set in JS */
+}
+
+svg {
+    border: 1px solid #ccc;
+    display: block; /* Ensure it behaves as a block-level element */
+    background-color: #fff; /* White background for the SVG area */
+}
+.rename-input {
+    position: absolute; /* Positioned relative to the page */
+    font-size: 16px;    /* Match title text style */
+    font-weight: bold;  /* Match title text style */
+    font-family: sans-serif; /* Match title text style */
+    text-align: center;
+    border: 1px solid #7F8C8D; /* A subtle border */
+    padding: 1px 3px;      /* Minimal padding */
+    box-sizing: border-box;/* Ensures padding/border are within width/height */
+    z-index: 1000;         /* Ensure it's on top of SVG elements */
+}
+/* Transaction Modal Styles */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 2000; /* Above rename input */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 600px;
+    border-radius: 5px;
+}
+.modal-content h2 {
+    margin-top: 0;
+}
+.modal-content label {
+    display: block;
+    margin-top: 10px;
+}
+.modal-content input[type="text"],
+.modal-content input[type="number"],
+.modal-content select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.transaction-entry {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.transaction-entry select, .transaction-entry input { flex-grow: 1; }
+.close-button { float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+
+/* Transaction List Styles */
+.transaction-list-container {
+    width: 800px; /* Match SVG width */
+/*    max-height: 100px; /* Limit height and make scrollable */
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    padding: 10px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+.transaction-list-item {
+    display: flex; /* Use flexbox for alignment */
+    align-items: center; /* Vertically align items in the middle */
+    padding: 5px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+}
+.transaction-list-item:hover {
+    background-color: #e9e9e9;
+}
+
+.drag-handle {
+    cursor: move;
+    margin-right: 8px;
+    color: #aaa;
+}
+
+.transaction-number {
+    margin-right: 8px;
+    font-weight: bold;
+    color: #555;
+    flex-shrink: 0; /* Prevent number from shrinking */
+}
+
+.transaction-active-toggle {
+    margin-right: 8px; /* Space between toggle and description */
+    flex-shrink: 0; /* Prevent toggle from shrinking */
+}
+
+.transaction-description {
+    flex-grow: 1; /* Allows description to take up available space */
+    margin-right: 8px; /* Space before the delete button */
+    text-align: left; /* Explicitly align text to the left */
+}
+
+.transaction-list-item.inactive-transaction .transaction-description {
+    text-decoration: line-through;
+    color: #999; /* Grayed-out color */
+}
+
+.dragging-transaction {
+    opacity: 0.5;
+    background-color: #f0f8ff; /* AliceBlue, or similar light color */
+}
+.transaction-delete-btn {
+    color: red;
+    cursor: pointer;
+    background: none; /* Remove default button background */
+    border: none;     /* Remove default button border */
+    padding: 0 5px;   /* Add some padding for easier clicking */
+    font-size: 1.1em; /* Slightly larger 'X' */
+    flex-shrink: 0; /* Prevent delete button from shrinking */
+}
+.transaction-edit-btn {
+    color: #3498DB; /* A blue color for edit */
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0 5px;
+    margin-right: 5px; /* Space between edit and delete buttons */
+}
+.transaction-description-edit-input {
+    font-family: inherit; /* Match list item font */
+    font-size: inherit;   /* Match list item font size */
+    padding: 3px;         /* A little padding */
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    /* width is set inline in JS for now */
+}
+/* Local Highlight Styles (Yellow) */
+.local-highlight-list-item {
+    background-color: #fff3cd !important; /* Light yellow */
+    font-weight: bold;
+}
+
+.local-highlight-entry {
+    fill: #FFD700 !important; /* Gold/Yellow */
+    font-weight: bold;
+}
+/* Remote Highlight Styles (Blue) */
+.remote-highlight-list-item {
+    background-color: #d1ecf1 !important; /* Light blue */
+    font-weight: bold;
+}
+.remote-highlight-entry {
+    fill: #75b2dd !important; /* A distinct blue */
+    font-weight: bold;
+}

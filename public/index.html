@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>T-Collab - Collaborative T-Accounts</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="main-header">
+        <div> <!-- Left section of header -->
+            <span style="font-weight: bold;">Session:</span>
+            <select id="activeSessionsDropdown" style="padding: 5px; min-width: 150px;"></select>
+            <button id="copySessionLinkBtn" style="margin-left: 10px;">Copy Link</button>
+        </div>
+        <div> <!-- Right section of header -->
+            <button id="createNewSessionBtn" style="margin-left: 10px;">Create New Session</button>
+            <button id="deleteCurrentSessionBtn" style="margin-left: 10px; background-color: #dc3545;">Delete This Session</button>
+        </div>
+    </header>
+
+    <h2 id="sessionTitle" contenteditable="true" style="text-align: center;">Loading Session Title...</h2>
+
+    <!-- Button Container -->
+    <div id="buttonContainer" class="main-controls">
+        <button id="addAccountBtn">Add New T-Account</button>
+        <button id="arrangeAccountsBtn">Arrange Accounts</button>
+        <button id="clearAllBtn">Clear All</button>
+        <button id="openTransactionModalBtn">New Transaction</button>
+        <button id="exportBtn">Export Data</button>
+        <button id="importBtn">Import Data</button>
+    </div>
+
+    <!-- Transaction List Container -->
+    <div id="transactionListContainer" class="transaction-list-container">
+        <h4>Transactions:</h4>
+        <ol id="transactionList"></ol>
+    </div>
+    <!-- End Transaction List Container -->
+
+    <!-- Transaction Modal (hidden by default)-->
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="closeTransactionModal">&times;</span>
+            <h2>New Transaction</h2>
+            <form id="transactionForm"> <!-- Add form tag here -->
+                <label for="transactionDescription">Description:</label>
+                <input type="text" id="transactionDescription" name="transactionDescription">
+
+                <div id="transactionEntriesContainer">
+                    <!-- Transaction entry rows will be added here -->
+                </div>
+
+                <button type="button" id="addTransactionEntryRow" style="margin-top:15px; margin-bottom:15px;">Add Entry</button>
+                
+                <div>
+                    <strong>Total Debits: <span id="modalTotalDebits">0.00</span></strong><br>
+                    <strong>Total Credits: <span id="modalTotalCredits">0.00</span></strong>
+                </div>
+
+                <!-- The "allow unbalanced" checkbox will be inserted here by JS -->
+                <button type="button" id="saveTransactionBtn" style="margin-top:20px;">Save Transaction</button>
+            </form> <!-- Close form tag -->
+        </div>
+    </div>
+    <!-- End Transaction Modal -->
+
+    <!-- Add Socket.IO client library -->
+    <script src="/socket.io/socket.io.js"></script> <!-- Served by Socket.IO -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script type="module" src="js/app.js" defer></script>
+</body>
+</html>
