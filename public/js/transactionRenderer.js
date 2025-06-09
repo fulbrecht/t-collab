@@ -6,6 +6,7 @@ import { socket } from './socketService.js';
 import { renderTAccounts } from './tAccountRenderer.js';
 
 let draggedTransactionId = null;
+let lastDragOverTarget = null;
 
 function handleDragStart(event) {
     draggedTransactionId = event.target.getAttribute('data-transaction-id');
@@ -18,9 +19,14 @@ function handleDragOver(event) {
     event.preventDefault(); // Allow drop
     event.dataTransfer.dropEffect = 'move';
     const targetLi = event.target.closest('.transaction-list-item');
+
+    if (lastDragOverTarget && lastDragOverTarget !== targetLi) {
+        lastDragOverTarget.classList.remove('drag-over-target');
+    }
+
     if (targetLi && targetLi.getAttribute('data-transaction-id') !== draggedTransactionId) {
-        // Optional: Add visual cue for drop target
-        // targetLi.classList.add('drag-over-target');
+        targetLi.classList.add('drag-over-target');
+        lastDragOverTarget = targetLi;
     }
 }
 
@@ -28,6 +34,10 @@ function handleDrop(event) {
     event.preventDefault();
     const targetLi = event.target.closest('.transaction-list-item');
     if (!targetLi || !draggedTransactionId) return;
+
+    if (lastDragOverTarget) {
+        lastDragOverTarget.classList.remove('drag-over-target');
+    }
 
     const targetTransactionId = targetLi.getAttribute('data-transaction-id');
     if (targetTransactionId === draggedTransactionId) return;
@@ -50,7 +60,10 @@ function handleDrop(event) {
 function handleDragEnd(event) {
     event.target.classList.remove('dragging-transaction');
     draggedTransactionId = null;
-    // Optional: Remove any 'drag-over-target' classes
+    if (lastDragOverTarget) {
+        lastDragOverTarget.classList.remove('drag-over-target');
+        lastDragOverTarget = null;
+    }
 }
 
 export function renderTransactionList() {

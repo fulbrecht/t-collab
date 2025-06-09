@@ -218,6 +218,12 @@ svg {
     opacity: 0.5;
     background-color: #f0f8ff; /* AliceBlue, or similar light color */
 }
+
+.drag-over-target {
+    /* Example: Add a border or change background to indicate drop zone */
+    border-top: 2px dashed #007bff; /* Blue dashed line above the target */
+    background-color: #e6f2ff; /* Light blue background */
+}
 .transaction-delete-btn {
     color: red;
     cursor: pointer;
